@@ -1,5 +1,5 @@
 // Nightstand offline support: keeps the app's own files and book covers on the device.
-const APP = "nightstand-app-v2";
+const APP = "nightstand-app-v3";
 const COVERS = "nightstand-covers";
 const SHELL = ["./", "./index.html", "./config.js", "./firebase.bundle.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -17,7 +17,8 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   if (url.origin === self.location.origin) {
     // App files: try the network first so updates arrive, fall back to the saved copy offline.
-    e.respondWith(fetch(req).then(res => {
+    // cache: "no-cache" makes the browser check GitHub for a newer file every time
+    e.respondWith(fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(APP).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match("./index.html"))));

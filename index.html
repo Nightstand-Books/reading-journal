@@ -716,20 +716,23 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn,ratings_average,ratings_count,subject";
+const APP_VERSION = "2026.10.07-c";
+const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
-async function getJSON(url, signal, ms=9000){
-  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort("timeout"), ms);
-  if (signal){ if (signal.aborted) ctl.abort(signal.reason); else signal.addEventListener("abort", () => ctl.abort("cancel"), {once:true}); }
-  try {
-    const r = await fetch(url, {signal: ctl.signal});
-    if (!r.ok) { const e = new Error("status " + r.status); e.reason = `error ${r.status}`; throw e; }
-    return await r.json();
-  } catch(e){
-    if (signal?.aborted) { const a = new Error("cancel"); a.name = "AbortError"; throw a; }
-    if (!e.reason) e.reason = ctl.signal.aborted ? "took too long" : "blocked or unreachable";
-    throw e;
-  } finally { clearTimeout(t); }
+async function getJSON(url, signal, ms=15000){
+  const ctl = new AbortController(); let timedOut = false;
+  const t = setTimeout(() => { timedOut = true; ctl.abort(); }, ms);
+  if (signal){ if (signal.aborted) ctl.abort(); else signal.addEventListener("abort", () => ctl.abort(), {once:true}); }
+  let r;
+  try { r = await fetch(url, {signal: ctl.signal}); }
+  catch(_){
+    clearTimeout(t);
+    if (signal?.aborted && !timedOut) { const a = new Error("cancel"); a.name = "AbortError"; throw a; }
+    const e = new Error("fetch failed"); e.reason = timedOut ? "took too long" : "blocked or unreachable"; throw e;
+  }
+  clearTimeout(t);
+  if (!r.ok) { const e = new Error("status " + r.status); e.status = r.status; e.reason = r.status === 429 ? "too many requests" : `error ${r.status}`; throw e; }
+  try { return await r.json(); } catch(_) { const e = new Error("bad json"); e.reason = "sent something unreadable"; throw e; }
 }
 const olFetch = getJSON;
 const GB = "https://www.googleapis.com/books/v1/volumes";
@@ -743,7 +746,8 @@ function gbToDoc(it){
     isbn: ids, ratings_average: v.averageRating || "", ratings_count: v.ratingsCount || "", subject: v.categories || [],
     _desc: gbText(v.description), _src: "Google Books" };
 }
-async function gbSearch(q, signal, n=8){ const j = await getJSON(`${GB}?q=${encodeURIComponent(q)}&maxResults=${n}&printType=books`, signal); return (j.items || []).map(gbToDoc); }
+const gbKey = () => window.GOOGLE_BOOKS_KEY ? `&key=${encodeURIComponent(window.GOOGLE_BOOKS_KEY)}` : "";
+async function gbSearch(q, signal, n=8){ const j = await getJSON(`${GB}?q=${encodeURIComponent(q)}&maxResults=${n}&printType=books${gbKey()}`, signal, 10000); return (j.items || []).map(gbToDoc); }
 // Open Library first; Google Books if Open Library doesn't answer
 async function olSearch(q, signal){
   try { const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); S.ol.source = "Open Library"; S.ol.olProblem = ""; return j.docs || []; }
@@ -798,7 +802,7 @@ function runSummary(){}
 function freshOl(q=""){ return {q, results:[], loading:false, err:"", searched:false, picked:false, ctl:null, t:null}; }
 function olResultsHTML(){
   const o = S.ol;
-  if (o.loading) return `<p class="mini">Searching Open Library…</p>`;
+  if (o.loading) return `<p class="mini">${o.slow ? "Open Library is slow right now. Still searching (up to 15 seconds), then Google Books…" : "Searching Open Library…"}</p>`;
   if (o.err) return `<p class="mini">${esc(o.err)}</p>`;
   if (o.picked) return `<p class="mini ol-ok">✓ Filled in from ${esc(o.source||"Open Library")}. Check the details below.</p>`;
   if (!o.results.length) return o.searched && o.q.trim().length >= 3 ? `<p class="mini">No matches. Try fewer words, or fill in the details yourself.</p>` : "";
@@ -809,9 +813,10 @@ async function runOlSearch(){
   const o = S.ol; const q = o.q.trim();
   if (o.ctl) o.ctl.abort();
   if (q.length < 3){ o.results=[]; o.searched=false; o.loading=false; o.err=""; const el=$("#olResults"); if(el) el.innerHTML=olResultsHTML(); return; }
-  o.ctl = new AbortController(); o.loading = true; o.err = ""; const el0=$("#olResults"); if(el0) el0.innerHTML=olResultsHTML();
+  o.ctl = new AbortController(); o.loading = true; o.slow = false; o.err = ""; const el0=$("#olResults"); if(el0) el0.innerHTML=olResultsHTML();
+  const myCtl = o.ctl; setTimeout(() => { if (o.loading && o.ctl === myCtl){ o.slow = true; const el=$("#olResults"); if(el) el.innerHTML=olResultsHTML(); } }, 4000);
   try { o.results = await olSearch(q, o.ctl.signal); o.searched = true; o.loading = false; }
-  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Open Library nor Google Books answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
+  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Open Library nor Google Books answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.${/too many/.test(e.reason||"") && !window.GOOGLE_BOOKS_KEY ? " Adding your own free Google Books key stops the \"too many requests\" problem." : ""}` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
   const el = $("#olResults"); if (el) el.innerHTML = olResultsHTML();
 }
 async function pickOl(i){
@@ -864,6 +869,7 @@ function accountHTML(){
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
       <button class="acct-row" data-act="signout"><b>Sign out</b><span class="mini">Your books stay saved in your account</span></button>
     </div>
+    <p class="mini" style="margin:12px 0 0">Nightstand version ${APP_VERSION} · Google Books key ${window.GOOGLE_BOOKS_KEY ? "added" : "not added"}</p>
   </div>`;
 }
 function bulkHTML(){

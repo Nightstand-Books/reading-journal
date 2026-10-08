@@ -8,3 +8,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "761056916862",
   appId: "1:761056916862:web:bdbab80db7d3b731cc6f2f"
 };
+
+// Optional: your own free Google Books key, used when Open Library is slow.
+// Paste it between the quotes. Leave it empty to go without.
+window.GOOGLE_BOOKS_KEY = "";
