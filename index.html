@@ -101,6 +101,8 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .spine::before,.spine::after{content:"";position:absolute;left:3px;right:3px;height:2px;background:hsl(var(--h) 40% 70% / .55)}
 .spine::before{top:6px}.spine::after{bottom:6px}
 .spine span{display:block;max-height:100%;overflow:hidden;text-overflow:ellipsis;padding-block:6px}
+.spine.cc{background:linear-gradient(90deg,color-mix(in srgb,var(--c) 68%,#000),var(--c) 28%,color-mix(in srgb,var(--c) 90%,#000) 70%,color-mix(in srgb,var(--c) 62%,#000));color:var(--ct)}
+.spine.cc::before,.spine.cc::after{background:color-mix(in srgb,var(--ct) 50%,transparent)}
 .spine:hover,.spine:focus-visible{transform:translateY(-6px)}
 .spine.lean{transform:rotate(-7deg);transform-origin:bottom left;margin-left:6px}
 .spine.lean:hover{transform:rotate(-7deg) translateY(-6px)}
@@ -386,12 +388,16 @@ function cover(b, cls=""){
   const img = src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
   return `<div class="cover ${cls}" style="--h:${h}"><div class="band"></div><div class="ct">${esc(b.title||"Untitled")}</div><div class="ca">${esc(b.author||"")}</div>${img}</div>`;
 }
+function coverSrcOf(b){ return (b.coverId && S.coverMap[b.coverId]) || (b.olCover ? `https://covers.openlibrary.org/b/id/${encodeURIComponent(b.olCover)}-M.jpg` : "") || b.coverUrl || ""; }
 function spine(b, i){
   const pages = Number(b.pages)||300;
   const w = Math.max(16, Math.min(38, Math.round(12 + pages/22)));
   const ht = 92 + (hash(b.title) % 30);
   const lean = (i % 9 === 6) ? " lean" : "";
-  return `<div class="slot"><button class="spine${lean}" style="--h:${hueOf(b)};--w:${w}px;--ht:${ht}px" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}${b.author?" by "+esc(b.author):""}"><span>${esc(b.title)}</span></button></div>`;
+  const src = coverSrcOf(b);
+  const matched = b.spineColor && b.spineFor === srcKey(src) ? b.spineColor : "";
+  const colorVars = matched ? `;--c:${matched};--ct:${b.spineText||"#fff"}` : "";
+  return `<div class="slot"><button class="spine${lean}${matched?" cc":""}" style="--h:${hueOf(b)};--w:${w}px;--ht:${ht}px${colorVars}" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}${b.author?" by "+esc(b.author):""}"><span>${esc(b.title)}</span></button></div>`;
 }
 const PLANT = `<div class="slot" aria-hidden="true"><svg class="plant" viewBox="0 0 46 70"><path d="M23 44 C10 40 4 30 6 18 C14 22 20 30 23 44Z" fill="#4f8a5f"/><path d="M23 44 C34 38 42 28 40 14 C31 20 25 30 23 44Z" fill="#3f7550"/><path d="M23 44 C20 30 22 16 28 6 C31 18 28 32 23 44Z" fill="#5f9c6c"/><path d="M11 44 H35 L32 68 H14 Z" fill="#b8693f"/><rect x="9" y="42" width="28" height="6" rx="2" fill="#c97a4c"/></svg></div>`;
 
@@ -403,6 +409,67 @@ function yearsAvailable(){
 }
 function finishedIn(y){ return S.books.filter(b => b.status==="finished" && yr(b.finishDate)===y).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
 
+/* ---------- spine colors from covers ---------- */
+// Short, stable key for a cover source (uploaded photos are long data URLs)
+function srcKey(src){ return !src ? "" : src.startsWith("data:") ? "photo:" + hash(src) : src; }
+function dominantColor(img){
+  const W = 24, H = 36, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d", {willReadFrequently:true}); x.drawImage(img, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data; // throws if the image host doesn't allow reading
+  const buckets = new Map();
+  for (let i = 0; i < d.length; i += 4){
+    if (d[i+3] < 200) continue;
+    const r = d[i], g = d[i+1], b = d[i+2];
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    const sat = mx ? (mx - mn) / mx : 0;
+    // favor colorful pixels a little over plain white/black areas
+    const weight = 1 + sat * 1.5 - (mx > 240 && sat < .08 ? .6 : 0) - (mx < 25 ? .4 : 0);
+    const k = (r >> 5) << 6 | (g >> 5) << 3 | (b >> 5);
+    const e = buckets.get(k) || {w:0, r:0, g:0, b:0};
+    e.w += weight; e.r += r*weight; e.g += g*weight; e.b += b*weight; buckets.set(k, e);
+  }
+  let best = null; for (const e of buckets.values()) if (!best || e.w > best.w) best = e;
+  if (!best || best.w <= 0) return null;
+  let r = best.r/best.w, g = best.g/best.w, b = best.b/best.w;
+  // keep spines from being glaring: pull very light colors down a bit
+  const lum = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+  if (lum > .82){ r *= .86; g *= .86; b *= .86; }
+  const hex = "#" + [r,g,b].map(v => Math.round(v).toString(16).padStart(2,"0")).join("");
+  const l2 = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+  return {color: hex, text: l2 > .58 ? "#1c1c1c" : "#fbf7ee"};
+}
+function loadCors(src){
+  return new Promise((res, rej) => {
+    const img = new Image(); if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
+    const t = setTimeout(() => rej(new Error("slow")), 12000);
+    img.onload = () => { clearTimeout(t); res(img); }; img.onerror = () => { clearTimeout(t); rej(new Error("no read")); };
+    img.src = src;
+  });
+}
+const spineQueue = new Set(); let spineBusy = false;
+function queueSpineColors(books){
+  if (!S.canWrite || !S.db) return;
+  books.forEach(b => { const k = srcKey(coverSrcOf(b)); if (k && b.spineFor !== k && !S.spineTried?.[b.id + k]) spineQueue.add(b.id); });
+  if (!spineBusy) runSpineQueue();
+}
+async function runSpineQueue(){
+  spineBusy = true; S.spineTried = S.spineTried || {};
+  while (spineQueue.size){
+    const id = spineQueue.values().next().value; spineQueue.delete(id);
+    const b = S.books.find(x => x.id === id); if (!b) continue;
+    const src = coverSrcOf(b), k = srcKey(src); if (!k || b.spineFor === k) continue;
+    S.spineTried[id + k] = true;
+    let out = null;
+    try { out = dominantColor(await loadCors(src)); } catch(_) { out = null; }
+    if (!out && !navigator.onLine) continue;
+    // remember the attempt either way, so a cover that can't be read isn't retried on every device
+    const {id:_i, ...rest} = b;
+    try { await saveBook(id, {...rest, spineColor: out ? out.color : "", spineText: out ? out.text : "", spineFor: k}); } catch(_) {}
+    await new Promise(r => setTimeout(r, 150));
+  }
+  spineBusy = false;
+}
+
 /* ---------- render ---------- */
 function render(){
   const ys = yearsAvailable();
@@ -412,6 +479,7 @@ function render(){
   $("#importBtn").hidden = !S.canWrite || S.noDb;
   renderNotice();
   $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : libHTML();
+  if (S.tab==="dash" && S.loaded) queueSpineColors(finishedIn(S.year));
   if (S.tab==="lib") renderGrid();
   renderModal();
 }
@@ -716,7 +784,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.07-d";
+const APP_VERSION = "2026.10.07-e";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){

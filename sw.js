@@ -1,5 +1,5 @@
 // Nightstand offline support: keeps the app's own files and book covers on the device.
-const APP = "nightstand-app-v3";
+const APP = "nightstand-app-v4";
 const COVERS = "nightstand-covers";
 const SHELL = ["./", "./index.html", "./config.js", "./firebase.bundle.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -29,7 +29,8 @@ self.addEventListener("fetch", e => {
     // Covers and fonts: use the saved copy if there is one, otherwise fetch and save it.
     e.respondWith(caches.open(COVERS).then(async c => {
       const hit = await c.match(req);
-      if (hit) return hit;
+      // a saved copy fetched without permission can't be read for spine colors, so refetch for those requests
+      if (hit && !(req.mode === "cors" && hit.type === "opaque")) return hit;
       try { const res = await fetch(req); if (res.ok || res.type === "opaque") c.put(req, res.clone()); return res; }
       catch { return Response.error(); }
     }));
