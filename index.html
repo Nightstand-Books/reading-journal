@@ -13,7 +13,7 @@
 <title>Nightstand</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Karla:ital,wght@0,400;0,500;0,700;1,400&family=Caveat:wght@500&family=Bebas+Neue&family=Cinzel:wght@500&family=Playfair+Display:wght@500&family=Special+Elite&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Karla:ital,wght@0,400;0,500;0,700;1,400&family=Caveat:wght@500&family=Bebas+Neue&family=Cinzel:wght@500&family=Playfair+Display:wght@500;600&family=Special+Elite&family=Lora:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:wght@400;600;700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
 /* Layout: a library study — header + tabs; dashboard = goal ring & tiles, a wooden bookshelf of the year's finished books, then charts; library = cover wall */
 :root{
@@ -38,7 +38,7 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
 .wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:22px 60px}
 @media (max-width:600px){.wrap{padding-inline:16px}}
-h1,h2,h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:.005em}
+h1,h2,h3{font-family:var(--f-display);font-weight:var(--fw-display,400);margin:0;text-wrap:balance;letter-spacing:.005em}
 h1{font-size:clamp(28px,4.5vw,40px);line-height:1.05}
 h2{font-size:21px}
 .eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -158,6 +158,19 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .deco-tile svg{max-height:96px;width:auto}
 .deco-tile .pair{display:flex;gap:18px;align-items:flex-end}
 .deco-tile>span:last-child{font-size:12.5px}
+.appearance{display:flex;flex-direction:column;gap:14px;margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.ap-row{display:flex;flex-direction:column;gap:8px}
+.ap-l{font-size:13px;font-weight:700}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.theme-sw{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;font-size:13px}
+.theme-sw .dots{display:flex}
+.theme-sw .dots i{width:18px;height:18px;border-radius:50%;margin-left:-5px;border:2px solid var(--surface)}
+.theme-sw .dots i:first-child{margin-left:0}
+.theme-sw[aria-pressed="true"],.font-sw[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.font-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.font-sw{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;text-align:left}
+.font-sw .fd{font-size:28px;line-height:1;min-width:44px;text-align:center}
+.font-sw .fl{display:flex;flex-direction:column;min-width:0}
 .spine-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;font-size:13px}
 .spine-ctl input[type=color]{width:38px;height:30px;padding:0 2px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer}
 .plant{width:46px;height:auto;display:block}
@@ -730,6 +743,69 @@ async function pickCover(i){
   render();
 }
 
+/* ---------- appearance: color theme, light/dark, fonts ---------- */
+const TOKEN_KEYS = ["bg","surface","sunk","ink","muted","line","accent","accent-ink","brass","rust","wood1","wood2","shelf-back"];
+const T = (...v) => Object.fromEntries(TOKEN_KEYS.map((k, i) => [k, v[i]]));
+const THEMES = {
+  forest:   {label:"Forest",   light:T("#eceee5","#f7f8f2","#e2e6da","#1c2a22","#5a6a5f","#d0d7c9","#2d5b44","#f4f6ef","#a57724","#a4472f","#7b502f","#5b3a20","#dfe4d6"),
+                               dark: T("#0e1813","#15231c","#0b140f","#e5ebdd","#98a99c","#283a30","#86bb99","#0e1813","#d6aa55","#d77f62","#6a4327","#452a16","#0a120e")},
+  ocean:    {label:"Ocean",    light:T("#e8edf1","#f6f8fa","#dde4ea","#17242e","#576773","#cbd5dd","#24506e","#f2f6f9","#a57724","#a4472f","#7b502f","#5b3a20","#d9e2e9"),
+                               dark: T("#0c141b","#132029","#09111a","#e1e9ef","#93a4b1","#24343f","#7fb0d1","#0c141b","#d6aa55","#d77f62","#6a4327","#452a16","#08101a")},
+  plum:     {label:"Plum",     light:T("#efe9ef","#f9f6f9","#e6dde6","#2a1d2a","#6b5a6b","#dacfda","#5e3460","#f9f3f9","#a57724","#a4472f","#6e4a3a","#4f3226","#e4dae4"),
+                               dark: T("#161017","#211823","#110c12","#efe5ef","#ab98ab","#3a2c3b","#c69bc8","#161017","#d6aa55","#d98a74","#5e3d30","#3e271e","#0f0a10")},
+  rosewood: {label:"Rosewood", light:T("#f3eae9","#fbf6f5","#ecdedc","#2e1d1c","#735c5a","#e2d0ce","#8a3a4a","#fbf4f3","#a57724","#b0532f","#7b502f","#5b3a20","#ead9d7"),
+                               dark: T("#18100f","#241817","#120b0b","#f2e5e3","#b39895","#3d2b29","#e09aa6","#18100f","#d6aa55","#e08a62","#6a4327","#452a16","#100a09")},
+  clay:     {label:"Clay",     light:T("#f1ebe3","#faf6f0","#e9e0d4","#2b2018","#6e5f52","#ddd1c2","#9a4a2a","#fbf5ef","#9a7020","#8f3a2a","#7b502f","#5b3a20","#e7ddd0"),
+                               dark: T("#17110c","#231a13","#110c08","#f1e7dc","#b19e8c","#3b2d22","#e2956f","#17110c","#d6aa55","#e0806a","#6a4327","#452a16","#0f0b07")},
+  slate:    {label:"Slate",    light:T("#ebecee","#f7f8f9","#e0e2e5","#1d2126","#5f6670","#d2d6db","#34404c","#f4f6f8","#a57724","#a4472f","#6f5640","#4f3d2c","#dfe2e6"),
+                               dark: T("#111316","#1a1d21","#0c0e10","#e6e8eb","#9aa1aa","#2b3036","#aab7c4","#111316","#d6aa55","#d77f62","#5e4a37","#3e3124","#0b0c0e")}
+};
+const FONT_SETS = {
+  classic:  {label:"Classic",     note:"Gloock + Karla",               display:'"Gloock", Georgia, serif',                     body:'"Karla", "Segoe UI", system-ui, sans-serif', weight:400},
+  elegant:  {label:"Elegant",     note:"Playfair Display + Lora",      display:'"Playfair Display", Georgia, serif',          body:'"Lora", Georgia, serif',                     weight:600},
+  friendly: {label:"Friendly",    note:"Nunito, rounded and soft",      display:'"Nunito", "Segoe UI", system-ui, sans-serif', body:'"Nunito", "Segoe UI", system-ui, sans-serif', weight:800},
+  readable: {label:"Easy reading", note:"Atkinson Hyperlegible, made for clear letters", display:'"Atkinson Hyperlegible", Verdana, sans-serif', body:'"Atkinson Hyperlegible", Verdana, sans-serif', weight:700},
+  typewriter:{label:"Typewriter", note:"Special Elite + Karla",         display:'"Special Elite", "Courier New", monospace',   body:'"Karla", "Segoe UI", system-ui, sans-serif', weight:400},
+  storybook:{label:"Storybook",   note:"Caveat headings + Nunito",      display:'"Caveat", cursive',                           body:'"Nunito", "Segoe UI", system-ui, sans-serif', weight:600}
+};
+const darkMQ = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+function currentLook(){
+  const saved = (S.settings && S.settings.look) || (() => { try { return JSON.parse(localStorage.getItem("ns-look") || "null"); } catch { return null; } })() || {};
+  return { theme: THEMES[saved.theme] ? saved.theme : "forest", mode: ["light","dark","auto"].includes(saved.mode) ? saved.mode : "auto", font: FONT_SETS[saved.font] ? saved.font : "classic" };
+}
+function applyLook(look = currentLook()){
+  const dark = look.mode === "dark" || (look.mode === "auto" && darkMQ && darkMQ.matches);
+  const pal = THEMES[look.theme][dark ? "dark" : "light"], root = document.documentElement;
+  TOKEN_KEYS.forEach(k => root.style.setProperty("--" + k, pal[k]));
+  root.style.setProperty("color-scheme", dark ? "dark" : "light");
+  root.dataset.theme = dark ? "dark" : "light";
+  const f = FONT_SETS[look.font];
+  root.style.setProperty("--f-display", f.display); root.style.setProperty("--f-body", f.body); root.style.setProperty("--fw-display", f.weight);
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute("content", dark ? pal.bg : pal.accent));
+  try { localStorage.setItem("ns-look", JSON.stringify(look)); } catch {}
+}
+function saveLook(patch){
+  const look = {...currentLook(), ...patch};
+  S.settings = {...S.settings, look};
+  applyLook(look);
+  S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
+  renderModal(); render();
+}
+darkMQ && darkMQ.addEventListener && darkMQ.addEventListener("change", () => { if (currentLook().mode === "auto") applyLook(); });
+function appearanceHTML(){
+  const look = currentLook();
+  const sw = Object.entries(THEMES).map(([k,t]) => `<button class="theme-sw" data-act="look-theme" data-k="${k}" aria-pressed="${k===look.theme}">
+      <span class="dots"><i style="background:${t.light.accent}"></i><i style="background:${t.light.sunk}"></i><i style="background:${t.dark.accent}"></i><i style="background:${t.dark.bg}"></i></span><span>${t.label}</span></button>`).join("");
+  const modes = [["light","Light"],["dark","Dark"],["auto","Match device"]].map(([k,l]) => `<button class="chip" data-act="look-mode" data-k="${k}" aria-pressed="${k===look.mode}">${l}</button>`).join("");
+  const fonts = Object.entries(FONT_SETS).map(([k,f]) => `<button class="font-sw" data-act="look-font" data-k="${k}" aria-pressed="${k===look.font}"><span class="fd" style="font-family:${esc(f.display)};font-weight:${f.weight}">Aa</span><span class="fl"><b>${f.label}</b><span class="mini">${f.note}</span></span></button>`).join("");
+  return `<div class="appearance"><div class="eyebrow">Appearance</div>
+    <div class="ap-row"><span class="ap-l">Color theme</span><div class="theme-grid">${sw}</div></div>
+    <div class="ap-row"><span class="ap-l">Mode</span><div class="chips">${modes}</div></div>
+    <div class="ap-row"><span class="ap-l">Font</span><div class="font-grid">${fonts}</div></div>
+    <p class="mini" style="margin:0">Saved to your account, so every device matches.</p></div>`;
+}
+applyLook();
+
 /* ---------- format chip ---------- */
 const FORMAT_ICONS = {
   Print: '<path d="M2 3.5c2.2-.9 4.2-.6 6 .9 1.8-1.5 3.8-1.8 6-.9v9.2c-2.2-.9-4.2-.6-6 .9-1.8-1.5-3.8-1.8-6-.9z"/><path d="M8 4.4v9.2"/>',
@@ -1123,7 +1199,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-g";
+const APP_VERSION = "2026.10.08-h";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1324,6 +1400,7 @@ function accountHTML(){
   <div class="sheet-b">
     <div class="acct">${u.photo?`<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar big">${esc((u.name||u.email||"?")[0].toUpperCase())}</span>`}<div style="min-width:0"><div style="font-weight:700">${esc(u.name||"")}</div><div class="mini">${esc(u.email||"")}</div></div></div>
     <p class="mini" style="margin:14px 0 0">Your journal syncs to every device where you sign in with this Google account. Changes made offline sync when you reconnect.</p>
+    ${appearanceHTML()}
     <div class="acct-list">
       <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without covers or details yet`:"Every book has been checked"}</span></button>
       <button class="acct-row" data-act="import"><b>Import books</b><span class="mini">From Goodreads, StoryGraph or a Nightstand backup</span></button>
@@ -1671,6 +1748,9 @@ document.addEventListener("click", async e => {
   const act = el.dataset.act;
   if (act==="tab"){ S.shelfEdit=false; S.shelfSel=null; S.tab=el.dataset.tab; render(); return; }
   if (act==="noop") return;
+  if (act==="look-theme"){ saveLook({theme: el.dataset.k}); return; }
+  if (act==="look-mode"){ saveLook({mode: el.dataset.k}); return; }
+  if (act==="look-font"){ saveLook({font: el.dataset.k}); return; }
   if (act==="shelf-edit"){ S.shelfEdit=!S.shelfEdit; S.shelfSel=null; render(); if (!S.shelfEdit) toast("Shelves saved"); return; }
   if (act==="shelf-add"){ editLayout(L => { L.rows.push([]); S.shelfTarget = L.rows.length - 1; }); return; }
   if (act==="shelf-target"){ S.shelfTarget = Number(el.dataset.r); render(); return; }
@@ -1928,7 +2008,7 @@ window.NSApp = {
       S.coverMap = Object.fromEntries(snap.docs.map(d => [d.id, d.data().data]));
       if (!S.editing && !S.cm) render();
     }, ()=>{}));
-    S.unsubs.push(S.db.doc("settings/main").onSnapshot(snap => { S.settings = snap.exists ? snap.data() : {goals:{}}; if (S.editing || S.cm) return; if(!S.editingGoal) render(); }, ()=>{}));
+    S.unsubs.push(S.db.doc("settings/main").onSnapshot(snap => { S.settings = snap.exists ? snap.data() : {goals:{}}; if (S.settings.look) applyLook(); if (S.editing || S.cm) return; if(!S.editingGoal) render(); }, ()=>{}));
     render();
   },
   signedOut(msg){
