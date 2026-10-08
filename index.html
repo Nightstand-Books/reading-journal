@@ -382,7 +382,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; cle
 /* ---------- covers & spines ---------- */
 function cover(b, cls=""){
   const h = hueOf(b);
-  const src = (b.coverId && S.coverMap[b.coverId]) || (b.olCover ? `https://covers.openlibrary.org/b/id/${encodeURIComponent(b.olCover)}-M.jpg` : "");
+  const src = (b.coverId && S.coverMap[b.coverId]) || (b.olCover ? `https://covers.openlibrary.org/b/id/${encodeURIComponent(b.olCover)}-M.jpg` : "") || b.coverUrl || "";
   const img = src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : "";
   return `<div class="cover ${cls}" style="--h:${h}"><div class="band"></div><div class="ct">${esc(b.title||"Untitled")}</div><div class="ca">${esc(b.author||"")}</div>${img}</div>`;
 }
@@ -617,10 +617,10 @@ function renderModal(){
     <div style="min-width:0">
       <h2>${esc(b.title)}</h2><div class="by">${esc(b.author||"Unknown author")}${b.series?` · <i>${esc(b.series)}</i>`:""}${b.year?` · ${esc(b.year)}`:""}</div>
       ${b.rating?`<div class="stars" style="font-size:20px">${stars(b.rating)} <span class="mini num" style="letter-spacing:0">My rating ${Number(b.rating)}/5</span></div>`:""}
-      ${b.olRating?`<div class="community num">Open Library readers: <b>${Number(b.olRating).toFixed(2)}</b>${b.olRatingCount?` (${b.olRatingCount} rating${Number(b.olRatingCount)===1?"":"s"})`:""}</div>`:""}
+      ${b.olRating?`<div class="community num">${esc(b.ratingSource||"Open Library")} readers: <b>${Number(b.olRating).toFixed(2)}</b>${b.olRatingCount?` (${b.olRatingCount} rating${Number(b.olRatingCount)===1?"":"s"})`:""}</div>`:""}
       ${b.communityRating?`<div class="community num">Goodreads readers: <b>${Number(b.communityRating).toFixed(2)}</b>${b.communityAsOf?` (as of ${fmtDate(b.communityAsOf)})`:""}</div>`:""}
       ${summaryBlock(b)}
-      ${S.canWrite && !b.olKey ? `<div class="block"><button class="btn" data-act="ol-lookup">Find on Open Library</button><span class="mini" style="margin-left:10px">Adds a cover, description and rating</span></div>` : ""}
+      ${S.canWrite && !b.olKey ? `<div class="block"><button class="btn" data-act="ol-lookup">Find cover &amp; details</button><span class="mini" style="margin-left:10px">Adds a cover, description and rating</span></div>` : ""}
       ${prog}${quick}
       <div class="facts">
         <div><span>Genre</span><span>${esc(b.genre||"—")}</span></div>
@@ -656,10 +656,10 @@ function formHTML(){
   return `<div class="sheet-h"><h2>${isNew?"Add a book":"Edit book"}</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><form id="bookForm" autocomplete="off">
     <div class="fg">
-      <div class="f full olbox"><label for="olq">Find on Open Library</label>
+      <div class="f full olbox"><label for="olq">Find the book</label>
         <input id="olq" type="search" placeholder="Type a title or author" value="${esc(S.ol?.q||"")}" autocomplete="off" enterkeyhint="search">
         <div id="olResults">${S.ol?olResultsHTML():""}</div>
-        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre.</span></div>
+        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre. If Open Library doesn't answer, Google Books is searched instead.</span></div>
       <div class="cover-pick"><div id="coverPreview">${cover({...d,hue:h})}</div>
         <div class="f"><label>Cover</label>
           ${S.assets?`<input type="file" id="coverFile" accept="image/*"><span class="hint">${d.olCover&&!d.coverId?"Using the Open Library cover. Upload a photo to use your own copy instead.":"Snap a photo of your copy or upload the cover image."}</span>${d.coverId?`<button type="button" class="linkish" data-act="remove-cover" style="align-self:flex-start">Remove photo</button>`:""}`:`<span class="hint">Pick a color for the cover.</span>`}
@@ -717,14 +717,46 @@ function clean(d){
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn,ratings_average,ratings_count,subject";
-async function olFetch(url, signal){ const r = await fetch(url, {signal, headers:{Accept:"application/json"}}); if (!r.ok) throw new Error("Open Library " + r.status); return r.json(); }
-async function olSearch(q, signal){ const j = await olFetch(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); return j.docs || []; }
+// fetch JSON with a time limit; failures carry a short reason we can show
+async function getJSON(url, signal, ms=9000){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort("timeout"), ms);
+  if (signal){ if (signal.aborted) ctl.abort(signal.reason); else signal.addEventListener("abort", () => ctl.abort("cancel"), {once:true}); }
+  try {
+    const r = await fetch(url, {signal: ctl.signal});
+    if (!r.ok) { const e = new Error("status " + r.status); e.reason = `error ${r.status}`; throw e; }
+    return await r.json();
+  } catch(e){
+    if (signal?.aborted) { const a = new Error("cancel"); a.name = "AbortError"; throw a; }
+    if (!e.reason) e.reason = ctl.signal.aborted ? "took too long" : "blocked or unreachable";
+    throw e;
+  } finally { clearTimeout(t); }
+}
+const olFetch = getJSON;
+const GB = "https://www.googleapis.com/books/v1/volumes";
+const gbText = h => { if (!h) return ""; const d = new DOMParser().parseFromString(String(h).replace(/<br\s*\/?>/gi,"\n").replace(/<\/p>/gi,"\n\n"), "text/html"); return (d.body.textContent||"").replace(/\n{3,}/g,"\n\n").trim(); };
+function gbToDoc(it){
+  const v = it.volumeInfo || {};
+  const img = (v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail) || "").replace(/^http:/, "https:").replace(/&edge=curl/, "");
+  const ids = (v.industryIdentifiers || []).map(x => x.identifier);
+  return { key: "gb:" + it.id, title: v.subtitle && v.title.length < 40 ? v.title : v.title, author_name: v.authors || [],
+    first_publish_year: parseInt(v.publishedDate) || "", number_of_pages_median: v.pageCount || "", cover_url: img,
+    isbn: ids, ratings_average: v.averageRating || "", ratings_count: v.ratingsCount || "", subject: v.categories || [],
+    _desc: gbText(v.description), _src: "Google Books" };
+}
+async function gbSearch(q, signal, n=8){ const j = await getJSON(`${GB}?q=${encodeURIComponent(q)}&maxResults=${n}&printType=books`, signal); return (j.items || []).map(gbToDoc); }
+// Open Library first; Google Books if Open Library doesn't answer
+async function olSearch(q, signal){
+  try { const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); S.ol.source = "Open Library"; S.ol.olProblem = ""; return j.docs || []; }
+  catch(e){ if (e.name === "AbortError") throw e; S.ol.olProblem = e.reason || "unreachable";
+    try { const r = await gbSearch(q, signal); S.ol.source = "Google Books"; return r; }
+    catch(e2){ if (e2.name === "AbortError") throw e2; const x = new Error("both"); x.reason = `Open Library: ${S.ol.olProblem}; Google Books: ${e2.reason || "unreachable"}`; throw x; } }
+}
 async function olSearchBook(title, author){
   const t = String(title).replace(/\(.*?\)/g,"").split(":")[0].trim();
-  const j = await olFetch(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`);
-  return (j.docs || [])[0] || null;
+  try { const j = await getJSON(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`); return (j.docs || [])[0] || null; }
+  catch(e){ const r = await gbSearch(`intitle:${t}${author?` inauthor:${author}`:""}`, null, 1); return r[0] || null; }
 }
-async function olWork(key){ try { return await olFetch(`${OL}${key}.json`); } catch { return null; } }
+async function olWork(key){ if (!key || String(key).startsWith("gb:")) return null; try { return await getJSON(`${OL}${key}.json`); } catch { return null; } }
 function cleanDesc(d){
   let t = typeof d === "string" ? d : (d && d.value) || "";
   t = t.split(/\n\s*-{3,}|\n\s*\*{3,}|\(\[source\]/)[0];
@@ -746,19 +778,20 @@ const GENRE_RULES = [
   [/fiction/i, "Literary fiction"]];
 function guessGenre(subjects){ const s = (subjects || []).slice(0, 40).join(" | "); for (const [re, g] of GENRE_RULES) if (re.test(s)) return g; return ""; }
 function olPatch(d, work, base, overwrite){
-  const p = { olKey: d.key, olCover: d.cover_i || base.olCover || "",
-    olRating: d.ratings_average ? Math.round(d.ratings_average * 100) / 100 : "", olRatingCount: d.ratings_count || "" };
+  const p = { olKey: d.key, olCover: d.cover_i || base.olCover || "", coverUrl: d.cover_url || base.coverUrl || "",
+    olRating: d.ratings_average ? Math.round(d.ratings_average * 100) / 100 : "", olRatingCount: d.ratings_count || "", ratingSource: d._src || "Open Library" };
   const want = (k, v) => { if (v === undefined || v === null || v === "") return; if (overwrite || base[k] === "" || base[k] == null) p[k] = v; };
   want("title", d.title); want("author", (d.author_name || [])[0]); want("pages", d.number_of_pages_median);
   want("year", d.first_publish_year ? String(d.first_publish_year) : "");
   want("isbn", (d.isbn || []).find(x => x.length === 13) || (d.isbn || [])[0]);
-  if (work){ const desc = cleanDesc(work.description); if (desc && !base.summary){ p.summary = desc; p.summaryBy = "Open Library"; } }
+  const rawDesc = work ? work.description : d._desc;
+  if (rawDesc){ const desc = cleanDesc(rawDesc); if (desc && !base.summary){ p.summary = desc; p.summaryBy = d._src || "Open Library"; } }
   const g = guessGenre((work && work.subjects) || d.subject); if (g && !base.genre) p.genre = g;
   return p;
 }
 function summaryBlock(b){
   if (!b.summary) return "";
-  const by = b.summaryBy === "Open Library" ? "From Open Library" : b.summaryBy === "Claude" ? "Written by Claude" : b.summaryBy === "me" ? "Written by you" : "";
+  const by = b.summaryBy === "Open Library" ? "From Open Library" : b.summaryBy === "Google Books" ? "From Google Books" : b.summaryBy === "Claude" ? "Written by Claude" : b.summaryBy === "me" ? "Written by you" : "";
   return `<div class="block"><div class="eyebrow">Summary</div><div class="summary-box"><p>${esc(b.summary)}</p>${by?`<div class="byline"><span>${by}</span></div>`:""}</div></div>`;
 }
 function runSummary(){}
@@ -767,9 +800,10 @@ function olResultsHTML(){
   const o = S.ol;
   if (o.loading) return `<p class="mini">Searching Open Library…</p>`;
   if (o.err) return `<p class="mini">${esc(o.err)}</p>`;
-  if (o.picked) return `<p class="mini ol-ok">✓ Filled in from Open Library. Check the details below.</p>`;
+  if (o.picked) return `<p class="mini ol-ok">✓ Filled in from ${esc(o.source||"Open Library")}. Check the details below.</p>`;
   if (!o.results.length) return o.searched && o.q.trim().length >= 3 ? `<p class="mini">No matches. Try fewer words, or fill in the details yourself.</p>` : "";
-  return `<div class="ol-list">${o.results.map((d,i)=>`<button type="button" class="ol-row" data-act="ol-pick" data-i="${i}">${d.cover_i?`<img src="https://covers.openlibrary.org/b/id/${encodeURIComponent(d.cover_i)}-S.jpg" alt="" loading="lazy">`:`<span class="ol-noc"></span>`}<span style="min-width:0"><span class="t">${esc(d.title)}</span><span class="a">${esc((d.author_name||[]).slice(0,2).join(", "))}${d.first_publish_year?` · ${d.first_publish_year}`:""}${d.number_of_pages_median?` · ${d.number_of_pages_median} pages`:""}${d.ratings_count?` · ★ ${Number(d.ratings_average).toFixed(1)}`:""}</span></span></button>`).join("")}</div>`;
+  const note = o.source==="Google Books" ? `<p class="mini" style="margin:0 0 6px">Open Library didn't answer (${esc(o.olProblem||"unreachable")}), so these results are from Google Books.</p>` : "";
+  return note + `<div class="ol-list">${o.results.map((d,i)=>`<button type="button" class="ol-row" data-act="ol-pick" data-i="${i}">${d.cover_i?`<img src="https://covers.openlibrary.org/b/id/${encodeURIComponent(d.cover_i)}-S.jpg" alt="" loading="lazy">`:d.cover_url?`<img src="${esc(d.cover_url)}" alt="" loading="lazy">`:`<span class="ol-noc"></span>`}<span style="min-width:0"><span class="t">${esc(d.title)}</span><span class="a">${esc((d.author_name||[]).slice(0,2).join(", "))}${d.first_publish_year?` · ${d.first_publish_year}`:""}${d.number_of_pages_median?` · ${d.number_of_pages_median} pages`:""}${d.ratings_count?` · ★ ${Number(d.ratings_average).toFixed(1)}`:""}</span></span></button>`).join("")}</div>`;
 }
 async function runOlSearch(){
   const o = S.ol; const q = o.q.trim();
@@ -777,7 +811,7 @@ async function runOlSearch(){
   if (q.length < 3){ o.results=[]; o.searched=false; o.loading=false; o.err=""; const el=$("#olResults"); if(el) el.innerHTML=olResultsHTML(); return; }
   o.ctl = new AbortController(); o.loading = true; o.err = ""; const el0=$("#olResults"); if(el0) el0.innerHTML=olResultsHTML();
   try { o.results = await olSearch(q, o.ctl.signal); o.searched = true; o.loading = false; }
-  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? "Open Library didn't answer. Try again in a moment, or fill in the details yourself." : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
+  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Open Library nor Google Books answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
   const el = $("#olResults"); if (el) el.innerHTML = olResultsHTML();
 }
 async function pickOl(i){
@@ -786,6 +820,7 @@ async function pickOl(i){
   const isNew = S.openId === "new";
   Object.assign(S.draft, olPatch(d, null, S.draft, isNew));
   S.ol.picked = true; renderModal();
+  if (d._src) return;
   const work = await olWork(d.key);
   if (!S.editing || !S.draft || S.draft.olKey !== d.key) return;
   readForm();
@@ -804,7 +839,7 @@ async function runBulkOL(){
       const cur = S.books.find(x => x.id === b.id) || b; const {id, ...rest} = cur;
       if (d){ const work = (!cur.summary || !cur.genre) ? await olWork(d.key) : null; await saveBook(id, {...rest, ...olPatch(d, work, cur, false)}); me.found++; }
       else { await saveBook(id, {...rest, olChecked: today()}); me.missed++; }
-    } catch(e){ me.err = navigator.onLine ? "Open Library stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
+    } catch(e){ me.err = navigator.onLine ? "Open Library and Google Books stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
     me.done++; if (S.cm === me) renderModal();
     await new Promise(r => setTimeout(r, 350));
   }

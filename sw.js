@@ -1,5 +1,5 @@
 // Nightstand offline support: keeps the app's own files and book covers on the device.
-const APP = "nightstand-app-v1";
+const APP = "nightstand-app-v2";
 const COVERS = "nightstand-covers";
 const SHELL = ["./", "./index.html", "./config.js", "./firebase.bundle.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -24,7 +24,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   const h = url.hostname;
-  if (h === "covers.openlibrary.org" || h.endsWith("archive.org") || h === "fonts.googleapis.com" || h === "fonts.gstatic.com") {
+  if (h === "covers.openlibrary.org" || h.endsWith("archive.org") || h === "books.google.com" || h.endsWith("googleusercontent.com") || h === "fonts.googleapis.com" || h === "fonts.gstatic.com") {
     // Covers and fonts: use the saved copy if there is one, otherwise fetch and save it.
     e.respondWith(caches.open(COVERS).then(async c => {
       const hit = await c.match(req);
