@@ -113,6 +113,9 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .reading-item{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;cursor:pointer;background:none;border:0;text-align:left;padding:0}
 .reading-item .t{font-weight:700;line-height:1.25}
 .reading-item .a{color:var(--muted);font-size:13px}
+.fmt{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px 2px 6px;border-radius:999px;border:1px solid currentColor}
+.fmt svg{width:14px;height:14px;flex:none}
+.fmt-print{color:var(--accent)} .fmt-ebook{color:var(--brass)} .fmt-audiobook{color:var(--rust)}
 .bar{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:6px}
 .bar i{display:block;height:100%;background:var(--brass);border-radius:99px}
 .mini{font-size:12.5px;color:var(--muted);margin-top:3px}
@@ -409,6 +412,18 @@ function yearsAvailable(){
 }
 function finishedIn(y){ return S.books.filter(b => b.status==="finished" && yr(b.finishDate)===y).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
 
+/* ---------- format chip ---------- */
+const FORMAT_ICONS = {
+  Print: '<path d="M2 3.5c2.2-.9 4.2-.6 6 .9 1.8-1.5 3.8-1.8 6-.9v9.2c-2.2-.9-4.2-.6-6 .9-1.8-1.5-3.8-1.8-6-.9z"/><path d="M8 4.4v9.2"/>',
+  Ebook: '<rect x="3.5" y="1.5" width="9" height="13" rx="1.6"/><path d="M5.8 4.5h4.4M5.8 6.8h4.4M5.8 9.1h2.8"/><path d="M7.2 12.6h1.6"/>',
+  Audiobook: '<path d="M2.5 10V8a5.5 5.5 0 0 1 11 0v2"/><rect x="2" y="9.5" width="3" height="4.5" rx="1"/><rect x="11" y="9.5" width="3" height="4.5" rx="1"/>'
+};
+const FORMAT_VERB = {Print:"Print", Ebook:"Ebook", Audiobook:"Audiobook"};
+function formatChip(f){
+  const k = FORMAT_ICONS[f] ? f : "Print";
+  return `<span class="fmt fmt-${k.toLowerCase()}"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${FORMAT_ICONS[k]}</svg>${FORMAT_VERB[k]}</span>`;
+}
+
 /* ---------- spine colors from covers ---------- */
 // Short, stable key for a cover source (uploaded photos are long data URLs)
 function srcKey(src){ return !src ? "" : src.startsWith("data:") ? "photo:" + hash(src) : src; }
@@ -555,7 +570,7 @@ function dashHTML(){
   const readingPanel = `<section class="panel"><div class="panel-h"><h2>On the nightstand</h2></div>
     ${reading.length ? `<div class="reading-list">${reading.map(b=>{
       const p=Number(b.pages)||0, c=Math.min(p||Infinity, Number(b.currentPage)||0), pc = p?Math.round(c/p*100):0;
-      return `<button class="reading-item" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div><div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${p?`Page ${c} of ${p} · ${pc}%`:"Add a page count to track progress"}</div></div></button>`;}).join("")}</div>`
+      return `<button class="reading-item" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div>${formatChip(b.format)}<div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${p?`Page ${c} of ${p} · ${pc}%`:"Add a page count to track progress"}</div></div></button>`;}).join("")}</div>`
       : `<p class="empty">Nothing in progress. Open a book from your library and mark it as reading.</p>`}
     ${tbr.length ? `<div class="block"><div class="eyebrow" style="margin-bottom:8px">Up next</div><div class="upnext">${tbr.slice(0,8).map(b=>`<button class="cover-btn" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}">${cover(b,"sm")}</button>`).join("")}</div></div>`:""}
   </section>`;
@@ -784,7 +799,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.07-e";
+const APP_VERSION = "2026.10.07-f";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
