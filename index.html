@@ -79,8 +79,12 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .goal-edit{display:flex;gap:6px;align-items:center;margin-top:10px}
 .goal-edit input{width:76px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .linkish{background:none;border:0;padding:0;color:var(--accent);font-weight:700;cursor:pointer;font-size:13.5px;text-decoration:underline;text-underline-offset:3px}
-.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-@media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tiles{display:grid;grid-template-columns:repeat(var(--tc,3),minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tiles .tile{grid-column:span var(--span,1)}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(min(var(--tc,3),2),minmax(0,1fr))}.tiles .tile{grid-column:span 1}.tiles .tile.odd-last{grid-column:1 / -1}}
+.row1.solo,.row2.solo,.row3.solo,.row4.solo{grid-template-columns:1fr}
+.dash-foot{display:flex;justify-content:center;margin-top:4px}
+.dc-group{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
 .tile{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .tile .v{font-family:var(--f-display);font-size:28px;line-height:1.1}
 .tile .v small{font-family:var(--f-body);font-size:13px;color:var(--muted)}
@@ -207,6 +211,13 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .legend b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
 .upnext{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
 .upnext .cover-btn{flex:0 0 74px}
+.un-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.upnext.reordering{flex-wrap:wrap;overflow:visible}
+.un-item{flex:0 0 74px;display:flex;flex-direction:column;gap:4px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.un-item.dragging{opacity:.5}
+.un-arrows{display:flex;justify-content:space-between}
+.un-arrow{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:1px 8px;cursor:pointer;font-size:11px;color:var(--ink)}
+.un-arrow:disabled{opacity:.3;cursor:default}
 
 /* covers */
 .cover{position:relative;aspect-ratio:2/3;width:100%;max-width:100%;border-radius:3px 6px 6px 3px;overflow:hidden;
@@ -806,6 +817,54 @@ function appearanceHTML(){
 }
 applyLook();
 
+/* ---------- up next order ---------- */
+function upNextList(){
+  const ord = S.settings.upNext || [];
+  const pos = id => { const i = ord.indexOf(id); return i < 0 ? 1e6 : i; };
+  return S.books.filter(b => b.status === "tbr").sort((a, b) => pos(a.id) - pos(b.id) || (a.dateAdded||"").localeCompare(b.dateAdded||"") || (a.createdAt||0) - (b.createdAt||0));
+}
+function saveUpNext(ids){
+  S.settings = {...S.settings, upNext: ids};
+  S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
+}
+let unDrag = null;
+document.addEventListener("pointerdown", e => {
+  if (!S.unReorder || e.target.closest(".un-arrow")) return;
+  const it = e.target.closest("#upnext.reordering .un-item"); if (!it) return;
+  e.preventDefault(); unDrag = {it, x:e.clientX, y:e.clientY, started:false};
+});
+document.addEventListener("pointermove", e => {
+  const d = unDrag; if (!d) return;
+  if (!d.started){ if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return; d.started = true; d.it.classList.add("dragging"); }
+  e.preventDefault();
+  const el = document.elementFromPoint(e.clientX, e.clientY); const over = el && el.closest("#upnext .un-item");
+  if (over && over !== d.it){ const r = over.getBoundingClientRect(); over.parentNode.insertBefore(d.it, e.clientX > r.left + r.width / 2 ? over.nextSibling : over); }
+}, {passive:false});
+const endUnDrag = () => {
+  const d = unDrag; if (!d) return; unDrag = null; d.it.classList.remove("dragging");
+  if (d.started){ saveUpNext([...document.querySelectorAll("#upnext .un-item")].map(x => x.dataset.id)); render(); }
+};
+document.addEventListener("pointerup", endUnDrag); document.addEventListener("pointercancel", endUnDrag);
+
+/* ---------- customize dashboard ---------- */
+const DASH_PARTS = [
+  ["Sections", [["goal","Reading goal"],["shelf","Bookcase"],["nightstand","On the nightstand"],["monthly","Books finished by month"],["genres","What you read (genres and formats)"],["moods","How your reading felt (moods)"],["pace","Pace"]]],
+  ["Stat tiles", [["t-pages","Pages read"],["t-rating","Average rating"],["t-reading","Reading now"],["t-tbr","Want to read"],["t-spent","Spent on books"],["t-length","Avg length"]]]
+];
+function dashCustomHTML(){
+  const hidden = new Set(S.settings.dashHidden || []);
+  return `<div class="sheet-h"><h2>Customize dashboard</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+  <div class="sheet-b"><p class="mini" style="margin:0 0 14px">Uncheck anything you don't want to see. The rest of the dashboard closes up around it. Nothing is deleted; check it again to bring it back.</p>
+  ${DASH_PARTS.map(([group, items]) => `<div class="dc-group"><div class="eyebrow">${group}</div>${items.map(([k,l]) => `<label class="check"><input type="checkbox" data-dash="${k}" ${hidden.has(k)?"":"checked"}> ${esc(l)}</label>`).join("")}</div>`).join("")}
+  <p class="mini">Moods and pace only appear once some finished books have them, usually from a StoryGraph import or Hardcover.</p>
+  <div class="foot"><button class="btn ghost" data-act="dash-showall">Show everything</button><button class="btn primary" data-act="close">Done</button></div></div>`;
+}
+function saveDashHidden(list){
+  S.settings = {...S.settings, dashHidden: list};
+  S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
+  render();
+}
+
 /* ---------- format chip ---------- */
 const FORMAT_ICONS = {
   Print: '<path d="M2 3.5c2.2-.9 4.2-.6 6 .9 1.8-1.5 3.8-1.8 6-.9v9.2c-2.2-.9-4.2-.6-6 .9-1.8-1.5-3.8-1.8-6-.9z"/><path d="M8 4.4v9.2"/>',
@@ -881,7 +940,7 @@ async function runSpineQueue(){
 
 /* ---------- render ---------- */
 function render(){
-  if (shelfDrag) { renderModal(); return; }
+  if (shelfDrag || (unDrag && unDrag.started)) { renderModal(); return; }
   const ys = yearsAvailable();
   $("#yearSel").innerHTML = ys.map(y=>`<option value="${y}" ${y===S.year?"selected":""}>${y}</option>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===S.tab)));
@@ -909,7 +968,7 @@ function dashHTML(){
   const rated = fin.filter(b=>Number(b.rating)>0);
   const avg = rated.length ? rated.reduce((s,b)=>s+Number(b.rating),0)/rated.length : 0;
   const reading = S.books.filter(b=>b.status==="reading");
-  const tbr = S.books.filter(b=>b.status==="tbr");
+  const tbr = upNextList();
   const spent = S.books.filter(b=>yr(b.dateAdded)===y).reduce((s,b)=>s+(Number(b.cost)||0),0);
   const both = rated.filter(b=>Number(b.communityRating)>0);
   let commLine = "";
@@ -950,14 +1009,19 @@ function dashHTML(){
         <div class="pace">${goal?esc(pace):"No goal set yet."}</div>${goalEdit}</div>
     </div></section>`;
 
-  const tiles = `<section class="tiles" aria-label="${y} at a glance">
-    <div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>
-    <div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>
-    <div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>
-    <div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>
-    <div class="tile"><span class="eyebrow">Spent on books</span><span class="v num">${money(spent)}</span><span class="mini">books added in ${y}</span></div>
-    <div class="tile"><span class="eyebrow">Avg length</span><span class="v num">${fin.length?Math.round(pages/fin.length):"—"} <small>pages</small></span></div>
-  </section>`;
+  const hidden = new Set(S.settings.dashHidden || []), show = k => !hidden.has(k);
+  const tileList = [
+    ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
+    ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
+    ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
+    ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
+    ["t-spent",   `<div class="tile"><span class="eyebrow">Spent on books</span><span class="v num">${money(spent)}</span><span class="mini">books added in ${y}</span></div>`],
+    ["t-length",  `<div class="tile"><span class="eyebrow">Avg length</span><span class="v num">${fin.length?Math.round(pages/fin.length):"—"} <small>pages</small></span></div>`]
+  ].filter(([k]) => show(k));
+  // Fill every row with no holes: 5 tiles = 3 across, then 2 wider ones
+  const tn = tileList.length, tcols = tn === 5 ? 6 : tn <= 3 ? tn : tn === 4 ? 2 : 3;
+  const spanOf = i => tn === 5 ? (i < 3 ? 2 : 3) : 1;
+  const tiles = tn ? `<section class="tiles" style="--tc:${tcols}" aria-label="${y} at a glance">${tileList.map((t, i) => t[1].replace('<div class="tile"', `<div class="tile${tn % 2 && i === tn - 1 ? " odd-last" : ""}" style="--span:${spanOf(i)}"`)).join("")}</section>` : "";
 
   const ed = S.shelfEdit, nRows = shelfLayout(y).rows.length;
   const shelf = `<section class="panel"><div class="panel-h"><h2>The ${y} ${nRows > 1 ? "bookcase" : "shelf"}</h2>${S.canWrite ? `<button class="btn ${ed?"primary":"ghost"}" data-act="shelf-edit">${ed?"Done":"Edit shelves"}</button>` : `<span class="eyebrow">${fin.length} finished · tap a spine</span>`}</div>
@@ -970,13 +1034,18 @@ function dashHTML(){
       const p=Number(b.pages)||0, c=Math.min(p||Infinity, Number(b.currentPage)||0), pc = p?Math.round(c/p*100):0;
       return `<button class="reading-item" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div>${formatChip(b.format)}<div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${p?`Page ${c} of ${p} · ${pc}%`:"Add a page count to track progress"}</div></div></button>`;}).join("")}</div>`
       : `<p class="empty">Nothing in progress. Open a book from your library and mark it as reading.</p>`}
-    ${tbr.length ? `<div class="block"><div class="eyebrow" style="margin-bottom:8px">Up next</div><div class="upnext">${tbr.slice(0,8).map(b=>`<button class="cover-btn" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}">${cover(b,"sm")}</button>`).join("")}</div></div>`:""}
+    ${tbr.length ? `<div class="block"><div class="un-head"><span class="eyebrow">Up next</span>${S.canWrite && tbr.length > 1 ? `<button class="linkish" data-act="un-reorder">${S.unReorder ? "Done" : "Reorder"}</button>` : ""}</div>
+      ${S.unReorder ? `<p class="mini" style="margin:0 0 8px">Drag covers into the order you plan to read them, or use the arrows.</p>` : ""}
+      <div class="upnext${S.unReorder ? " reordering" : ""}" id="upnext">${(S.unReorder ? tbr : tbr.slice(0,8)).map((b, i, arr) => S.unReorder
+        ? `<div class="un-item" data-id="${esc(b.id)}">${cover(b,"sm")}<span class="un-arrows"><button class="un-arrow" data-act="un-move" data-id="${esc(b.id)}" data-d="-1" aria-label="Move ${esc(b.title)} earlier" ${i===0?"disabled":""}>◀</button><button class="un-arrow" data-act="un-move" data-id="${esc(b.id)}" data-d="1" aria-label="Move ${esc(b.title)} later" ${i===arr.length-1?"disabled":""}>▶</button></span></div>`
+        : `<button class="cover-btn" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}">${cover(b,"sm")}</button>`).join("")}</div>
+      ${!S.unReorder && tbr.length > 8 ? `<p class="mini" style="margin:6px 0 0">+ ${tbr.length - 8} more on your want-to-read list</p>` : ""}</div>`:""}
   </section>`;
 
   // monthly chart
   const counts = Array(12).fill(0); fin.forEach(b => { const m = Number((b.finishDate||"").slice(5,7)); if(m) counts[m-1]++; });
   const maxV = Math.max(2, ...counts); const step = maxV<=4?1:Math.ceil(maxV/4);
-  const W=600,H=230,L=30,B=28,T=18,bw=(W-L-10)/12;
+  const W = show("genres") ? 600 : 1100, H=230, L=30, B=28, T=18, bw=(W-L-10)/12;
   const yv = v => H-B - (v/ (Math.ceil(maxV/step)*step)) * (H-B-T);
   let grid=""; for(let v=0; v<=Math.ceil(maxV/step)*step; v+=step) grid += `<line class="grid" x1="${L}" x2="${W-6}" y1="${yv(v)}" y2="${yv(v)}"/><text x="${L-8}" y="${yv(v)+4}" text-anchor="end">${v}</text>`;
   const nowM = y===thisYear ? new Date().getMonth() : -1;
@@ -1006,7 +1075,7 @@ function dashHTML(){
   // moods & pace (StoryGraph)
   const withMood = fin.filter(b=>Array.isArray(b.moods) && b.moods.length);
   const withPace = fin.filter(b=>b.pace);
-  let row4 = "";
+  let row4 = "", moodHTML = "", paceHTML = "";
   if (withMood.length || withPace.length){
     const mm = {}; withMood.forEach(b=>b.moods.forEach(m=>{ m=String(m).trim().toLowerCase(); if(m) mm[m]=(mm[m]||0)+1; }));
     const ml = Object.entries(mm).sort((a,b)=>b[1]-a[1]).slice(0,12); const mmax = ml[0]?.[1]||1;
@@ -1019,10 +1088,15 @@ function dashHTML(){
     const pacePanel = `<section class="panel"><div class="panel-h"><h2>Pace</h2><span class="eyebrow">${y}</span></div>
       ${withPace.length?`<div class="split">${PACES.map(p=>pc[p]?`<i style="width:${pc[p]/pt*100}%;background:${pcol[p]}"></i>`:"").join("")}</div>
       <div class="legend">${PACES.map(p=>`<span><b style="background:${pcol[p]}"></b>${p[0].toUpperCase()+p.slice(1)} ${pc[p]}</span>`).join("")}</div>`:`<p class="empty">No pace info on this year's finished books yet.</p>`}</section>`;
-    row4 = `<div class="row4">${moodPanel}${pacePanel}</div>`;
+    moodHTML = moodPanel; paceHTML = pacePanel;
   }
 
-  return `<div class="dash"><div class="row1">${goalPanel}${tiles}</div><div class="row2">${shelf}${readingPanel}</div><div class="row3">${chart}${genres}</div>${row4}</div>`;
+  // Only the sections left showing are laid out; a panel whose partner is hidden spans the full width
+  const rowOf = (cls, parts) => { parts = parts.filter(Boolean); return parts.length ? `<div class="${cls}${parts.length === 1 ? " solo" : ""}">${parts.join("")}</div>` : ""; };
+  const body = rowOf("row1", [show("goal") && goalPanel, tiles]) + rowOf("row2", [show("shelf") && shelf, show("nightstand") && readingPanel])
+    + rowOf("row3", [show("monthly") && chart, show("genres") && genres]) + rowOf("row4", [show("moods") && moodHTML, show("pace") && paceHTML]);
+  const custom = S.canWrite ? `<div class="dash-foot"><button class="btn ghost" data-act="dash-custom">Customize dashboard</button></div>` : "";
+  return `<div class="dash">${body || `<div class="panel empty">Everything on the dashboard is hidden. Choose <b>Customize dashboard</b> to bring sections back.</div>`}${custom}</div>`;
 }
 
 function libHTML(){
@@ -1081,7 +1155,7 @@ function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
   if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
   scrim.hidden = false; document.body.style.overflow="hidden";
-  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : cmHTML(); return; }
+  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : S.cm.type==="dash" ? dashCustomHTML() : cmHTML(); return; }
   if (S.openId==="import"){ sheet.innerHTML = importHTML(); return; }
   if (S.editing){ sheet.innerHTML = formHTML(); return; }
   const b = S.books.find(x=>x.id===S.openId);
@@ -1199,7 +1273,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-h";
+const APP_VERSION = "2026.10.08-i";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1403,6 +1477,7 @@ function accountHTML(){
     ${appearanceHTML()}
     <div class="acct-list">
       <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without covers or details yet`:"Every book has been checked"}</span></button>
+      <button class="acct-row" data-act="dash-custom"><b>Customize dashboard</b><span class="mini">Choose which sections and stats to show</span></button>
       <button class="acct-row" data-act="import"><b>Import books</b><span class="mini">From Goodreads, StoryGraph or a Nightstand backup</span></button>
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
       <button class="acct-row" data-act="signout"><b>Sign out</b><span class="mini">Your books stay saved in your account</span></button>
@@ -1748,6 +1823,11 @@ document.addEventListener("click", async e => {
   const act = el.dataset.act;
   if (act==="tab"){ S.shelfEdit=false; S.shelfSel=null; S.tab=el.dataset.tab; render(); return; }
   if (act==="noop") return;
+  if (act==="un-reorder"){ S.unReorder = !S.unReorder; render(); if (!S.unReorder) toast("Up next order saved"); return; }
+  if (act==="un-move"){ const ids = upNextList().map(b => b.id); const i = ids.indexOf(el.dataset.id), j = i + Number(el.dataset.d);
+    if (i >= 0 && j >= 0 && j < ids.length){ ids.splice(i, 1); ids.splice(j, 0, el.dataset.id); saveUpNext(ids); render(); } return; }
+  if (act==="dash-custom"){ S.openId=null; S.cm={type:"dash"}; renderModal(); return; }
+  if (act==="dash-showall"){ saveDashHidden([]); renderModal(); return; }
   if (act==="look-theme"){ saveLook({theme: el.dataset.k}); return; }
   if (act==="look-mode"){ saveLook({mode: el.dataset.k}); return; }
   if (act==="look-font"){ saveLook({font: el.dataset.k}); return; }
@@ -1875,6 +1955,11 @@ document.addEventListener("submit", async e => {
 
 document.addEventListener("change", async e => {
   if (e.target.id==="yearSel"){ S.year=Number(e.target.value); S.editingGoal=false; S.shelfEdit=false; S.shelfSel=null; S.shelfTarget=null; render(); }
+  if (e.target.dataset && e.target.dataset.dash && S.cm?.type==="dash"){
+    const hidden = new Set(S.settings.dashHidden || []); const k = e.target.dataset.dash;
+    if (e.target.checked) hidden.delete(k); else hidden.add(k);
+    saveDashHidden([...hidden]);
+  }
   if (e.target.id==="sp-font" && S.cm?.type==="spine"){ S.cm.d.font = e.target.value; refreshSpinePreview(); }
   if ((e.target.id==="sp-h-num" || e.target.id==="sp-w-num") && S.cm?.type==="spine"){
     // on leaving the box, pull out-of-range numbers back inside the allowed range
