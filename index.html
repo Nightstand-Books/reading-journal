@@ -230,6 +230,13 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .community{font-size:13px;color:var(--muted);margin-top:4px}
 .community b{color:var(--ink)}
 .community a{color:var(--accent);font-weight:700}
+.dcover{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.switch-cover{justify-content:center;font-size:13.5px}
+.cover-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px 12px;max-height:56vh;overflow-y:auto;padding:2px}
+.cover-pick-btn{display:flex;flex-direction:column;gap:5px;background:none;border:0;padding:0;cursor:pointer;text-align:center}
+.cover-pick-btn img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:3px 6px 6px 3px;background:var(--sunk);box-shadow:0 1px 2px rgba(0,0,0,.18),0 6px 14px -8px rgba(0,0,0,.45);border:2px solid transparent}
+.cover-pick-btn:hover img,.cover-pick-btn:focus-visible img{border-color:var(--brass)}
+.cover-pick-btn span{font-size:11px;color:var(--muted)}
 .cw summary{cursor:pointer;font-size:13.5px;color:var(--muted)}
 .cw p{font-size:14px;margin:6px 0 0}
 .row4{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
@@ -412,6 +419,61 @@ function yearsAvailable(){
   return [...ys].sort((a,b)=>b-a);
 }
 function finishedIn(y){ return S.books.filter(b => b.status==="finished" && yr(b.finishDate)===y).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
+
+/* ---------- switch cover ---------- */
+const SRC_ORDER = {"Hardcover":0, "Google Books":1, "Open Library":2};
+const olCoverUrl = id => `https://covers.openlibrary.org/b/id/${encodeURIComponent(id)}-M.jpg?default=false`;
+async function findCovers(q){
+  const out = [], seen = new Set();
+  const add = (url, src, label, color) => { if (!url) return; const k = url.replace(/[?&]default=false/,""); if (seen.has(k)) return; seen.add(k); out.push({url, src, label: label||"", color: color||""}); };
+  const jobs = [];
+  if (hcProxy()) jobs.push(hcSearch(q, null, 8).then(r => r.forEach(d => add(d.cover_url, "Hardcover", d.title, d._color))).catch(()=>{}));
+  jobs.push(gbSearch(q, null, 20).then(r => r.forEach(d => add(d.cover_url, "Google Books", d.title))).catch(()=>{}));
+  jobs.push((async () => {
+    const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=key,title,cover_i&limit=5`);
+    const docs = j.docs || [];
+    docs.forEach(d => { if (d.cover_i) add(olCoverUrl(d.cover_i), "Open Library", d.title); });
+    if (docs[0]?.key){
+      const e = await getJSON(`${OL}${docs[0].key}/editions.json?limit=60`);
+      (e.entries || []).forEach(ed => (ed.covers || []).filter(c => c > 0).forEach(c => add(olCoverUrl(c), "Open Library", ed.title)));
+    }
+  })().catch(()=>{}));
+  await Promise.all(jobs);
+  return out.sort((a,b) => SRC_ORDER[a.src] - SRC_ORDER[b.src]).slice(0, 60);
+}
+async function runCoverSearch(){
+  const m = S.cm; if (!m || m.type !== "covers") return;
+  m.loading = true; m.results = []; m.err = ""; renderModal();
+  const token = (m.token = (m.token||0) + 1);
+  try { const r = await findCovers(m.q); if (S.cm !== m || m.token !== token) return; m.results = r; }
+  catch(_) { m.err = "The cover sources didn't answer. Try again in a moment."; }
+  m.loading = false; if (S.cm === m) renderModal();
+}
+function coversHTML(){
+  const m = S.cm; const b = S.books.find(x => x.id === m.id) || {};
+  const grid = m.loading ? `<p class="mini">Looking for covers on ${hcProxy()?"Hardcover, ":""}Google Books and Open Library…</p>`
+    : m.err ? `<p class="err">${esc(m.err)}</p>`
+    : !m.results.length ? `<p class="mini">No covers found for that search. Try just the title, or a different spelling.</p>`
+    : `<p class="mini" style="margin:0 0 10px">Tap a cover to use it. Covers from other editions are included.</p><div class="cover-grid">${m.results.map((c,i)=>`<button class="cover-pick-btn" data-act="cover-pick" data-i="${i}" title="${esc(c.label)}"><img src="${esc(c.url)}" alt="${esc(c.label)}" loading="lazy" onerror="this.closest('button').remove()"><span>${esc(c.src)}</span></button>`).join("")}</div>`;
+  return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">Switch cover</div><h2 style="margin-top:2px">${esc(b.title||"")}</h2></div><button class="x" data-act="close-covers" aria-label="Close">×</button></div>
+  <div class="sheet-b">
+    <form id="coverSearch" class="pick-tools" autocomplete="off"><input class="search" id="coverQ" type="search" value="${esc(m.q)}" aria-label="Search for covers" enterkeyhint="search"><button class="btn" type="submit">Search</button></form>
+    ${grid}
+    <div class="foot"><div class="grp"><button class="btn ghost" data-act="cover-plain">Use a plain color cover</button><button class="btn ghost" data-act="cover-photo">Upload my own photo</button></div><button class="btn" data-act="close-covers">Cancel</button></div>
+  </div>`;
+}
+async function pickCover(i){
+  const m = S.cm, c = m && m.results[i]; if (!c) return;
+  const b = S.books.find(x => x.id === m.id); if (!b) return;
+  const {id, ...rest} = b; const oldPhoto = b.coverId;
+  const next = {...rest, coverUrl: c.url, olCover: "", coverId: null, spineColor: "", spineText: "", spineFor: ""};
+  if (c.color && /^#[0-9a-f]{6}$/i.test(c.color)){ const r=parseInt(c.color.slice(1,3),16), g=parseInt(c.color.slice(3,5),16), bb=parseInt(c.color.slice(5,7),16);
+    next.spineColor = c.color; next.spineText = (0.2126*r+0.7152*g+0.0722*bb)/255 > .58 ? "#1c1c1c" : "#fbf7ee"; next.spineFor = c.url; }
+  S.cm = null; S.openId = id; renderModal();
+  try { await saveBook(id, next); if (oldPhoto && S.assets) S.assets.delete(oldPhoto).catch(()=>{}); toast("Cover updated"); }
+  catch(e){ toast(writeErr(e)); }
+  render();
+}
 
 /* ---------- format chip ---------- */
 const FORMAT_ICONS = {
@@ -684,7 +746,7 @@ function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
   if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
   scrim.hidden = false; document.body.style.overflow="hidden";
-  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : cmHTML(); return; }
+  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : cmHTML(); return; }
   if (S.openId==="import"){ sheet.innerHTML = importHTML(); return; }
   if (S.editing){ sheet.innerHTML = formHTML(); return; }
   const b = S.books.find(x=>x.id===S.openId);
@@ -697,7 +759,7 @@ function renderModal(){
   const quick = S.canWrite && b.status==="tbr" ? `<div class="block"><button class="btn primary" data-act="start">Start reading today</button></div>` : "";
   sheet.innerHTML = `<div class="sheet-h"><span class="status s-${esc(b.status)}">${esc(STATUS[b.status])}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="detail">
-    <div class="dcover">${cover(b)}</div>
+    <div class="dcover">${cover(b)}${S.canWrite?`<button class="btn ghost switch-cover" data-act="covers">Switch cover</button>`:""}</div>
     <div style="min-width:0">
       <h2>${esc(b.title)}</h2><div class="by">${esc(b.author||"Unknown author")}${b.series?` · <i>${esc(b.series)}</i>`:""}${b.year?` · ${esc(b.year)}`:""}</div>
       ${b.rating?`<div class="stars" style="font-size:20px">${stars(b.rating)} <span class="mini num" style="letter-spacing:0">My rating ${Number(b.rating)}/5</span></div>`:""}
@@ -801,7 +863,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-a";
+const APP_VERSION = "2026.10.08-b";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1354,6 +1416,11 @@ document.addEventListener("click", async e => {
   if (act==="backup"){ downloadBackup(); return; }
   if (act==="bulk-ol"){ S.openId=null; S.imp=null; runBulkOL(); return; }
   if (act==="ol-pick"){ pickOl(Number(el.dataset.i)); return; }
+  if (act==="covers"){ const b=S.books.find(x=>x.id===S.openId); if(!b) return; S.cm={type:"covers", id:b.id, q:`${String(b.title).replace(/\(.*?\)/g,"").trim()} ${b.author||""}`.trim(), results:[], loading:true}; renderModal(); runCoverSearch(); return; }
+  if (act==="close-covers"){ const id=S.cm?.id; S.cm=null; S.openId=id||null; renderModal(); return; }
+  if (act==="cover-pick"){ pickCover(Number(el.dataset.i)); return; }
+  if (act==="cover-plain"){ const id=S.cm.id; const b=S.books.find(x=>x.id===id); S.cm=null; S.openId=id; renderModal(); if(b){ const {id:_x,...rest}=b; await saveBook(id,{...rest, coverUrl:"", olCover:"", coverId:null, spineColor:"", spineText:"", spineFor:""}); if (b.coverId && S.assets) S.assets.delete(b.coverId).catch(()=>{}); toast("Using a plain color cover"); render(); } return; }
+  if (act==="cover-photo"){ const id=S.cm.id; const b=S.books.find(x=>x.id===id); S.cm=null; S.openId=id; if(b){ S.draft={...blank(),...b}; S.editing=true; S.ol=freshOl(); S.err=""; } renderModal(); setTimeout(()=>$("#coverFile")?.focus(),50); return; }
   if (act==="ol-lookup"){ const b=S.books.find(x=>x.id===S.openId); if(!b) return; S.draft={...blank(),...b}; S.editing=true; S.err=""; S.ol=freshOl(`${b.title} ${b.author||""}`.trim()); renderModal(); runOlSearch(); return; }
   if (act==="chal-new"){ S.cm={type:"form", id:null, paste:false, draft:{name:"",description:"",startDate:"",endDate:"",prompts:Array(12).fill(""),slots:[]}}; renderModal(); setTimeout(()=>$("#c-name")?.focus(),30); return; }
   if (act==="chal-edit"){ const c=S.challenges.find(x=>x.id===el.dataset.cid); if(!c) return;
@@ -1414,6 +1481,7 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("submit", async e => {
+  if (e.target.id==="coverSearch"){ e.preventDefault(); S.cm.q = $("#coverQ").value.trim() || S.cm.q; runCoverSearch(); return; }
   if (e.target.id==="chalForm"){ e.preventDefault(); saveChallenge(); return; }
   if (e.target.id!=="bookForm") return;
   e.preventDefault(); readForm();
