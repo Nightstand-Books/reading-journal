@@ -12,3 +12,4 @@ window.FIREBASE_CONFIG = {
 // Optional: your own free Google Books key, used when Open Library is slow.
 // Paste it between the quotes. Leave it empty to go without.
 window.GOOGLE_BOOKS_KEY = "AIzaSyBXgt9yFC0MoNhT_k27IZN81_dZpVCjVjY";
+window.HARDCOVER_PROXY = "https://nightstand-books.ashlinelizabethrose.workers.dev";
