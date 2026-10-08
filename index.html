@@ -659,7 +659,7 @@ function formHTML(){
       <div class="f full olbox"><label for="olq">Find the book</label>
         <input id="olq" type="search" placeholder="Type a title or author" value="${esc(S.ol?.q||"")}" autocomplete="off" enterkeyhint="search">
         <div id="olResults">${S.ol?olResultsHTML():""}</div>
-        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre. If Open Library doesn't answer, Google Books is searched instead.</span></div>
+        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre. Searches Google Books first, then Open Library if Google Books doesn't answer.</span></div>
       <div class="cover-pick"><div id="coverPreview">${cover({...d,hue:h})}</div>
         <div class="f"><label>Cover</label>
           ${S.assets?`<input type="file" id="coverFile" accept="image/*"><span class="hint">${d.olCover&&!d.coverId?"Using the Open Library cover. Upload a photo to use your own copy instead.":"Snap a photo of your copy or upload the cover image."}</span>${d.coverId?`<button type="button" class="linkish" data-act="remove-cover" style="align-self:flex-start">Remove photo</button>`:""}`:`<span class="hint">Pick a color for the cover.</span>`}
@@ -716,7 +716,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.07-c";
+const APP_VERSION = "2026.10.07-d";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -748,17 +748,26 @@ function gbToDoc(it){
 }
 const gbKey = () => window.GOOGLE_BOOKS_KEY ? `&key=${encodeURIComponent(window.GOOGLE_BOOKS_KEY)}` : "";
 async function gbSearch(q, signal, n=8){ const j = await getJSON(`${GB}?q=${encodeURIComponent(q)}&maxResults=${n}&printType=books${gbKey()}`, signal, 10000); return (j.items || []).map(gbToDoc); }
-// Open Library first; Google Books if Open Library doesn't answer
+// Which source is searched first. Google Books by default; set window.SEARCH_FIRST = "openlibrary" in config.js to flip it.
+const googleFirst = () => (window.SEARCH_FIRST || "google") !== "openlibrary";
+const firstName = () => googleFirst() ? "Google Books" : "Open Library";
+const secondName = () => googleFirst() ? "Open Library" : "Google Books";
+async function olOnly(q, signal){ const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); return j.docs || []; }
 async function olSearch(q, signal){
-  try { const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); S.ol.source = "Open Library"; S.ol.olProblem = ""; return j.docs || []; }
+  const a = googleFirst() ? () => gbSearch(q, signal) : () => olOnly(q, signal);
+  const b = googleFirst() ? () => olOnly(q, signal) : () => gbSearch(q, signal);
+  try { const r = await a(); S.ol.source = firstName(); S.ol.olProblem = ""; return r; }
   catch(e){ if (e.name === "AbortError") throw e; S.ol.olProblem = e.reason || "unreachable";
-    try { const r = await gbSearch(q, signal); S.ol.source = "Google Books"; return r; }
-    catch(e2){ if (e2.name === "AbortError") throw e2; const x = new Error("both"); x.reason = `Open Library: ${S.ol.olProblem}; Google Books: ${e2.reason || "unreachable"}`; throw x; } }
+    try { const r = await b(); S.ol.source = secondName(); return r; }
+    catch(e2){ if (e2.name === "AbortError") throw e2; const x = new Error("both"); x.reason = `${firstName()}: ${S.ol.olProblem}; ${secondName()}: ${e2.reason || "unreachable"}`; throw x; } }
 }
 async function olSearchBook(title, author){
   const t = String(title).replace(/\(.*?\)/g,"").split(":")[0].trim();
-  try { const j = await getJSON(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`); return (j.docs || [])[0] || null; }
-  catch(e){ const r = await gbSearch(`intitle:${t}${author?` inauthor:${author}`:""}`, null, 1); return r[0] || null; }
+  const gb = async () => (await gbSearch(`intitle:${t}${author?` inauthor:${author}`:""}`, null, 1))[0] || null;
+  const ol = async () => (await getJSON(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`)).docs?.[0] || null;
+  const [a, b] = googleFirst() ? [gb, ol] : [ol, gb];
+  try { const r = await a(); if (r) return r; } catch(_) {}
+  return await b();
 }
 async function olWork(key){ if (!key || String(key).startsWith("gb:")) return null; try { return await getJSON(`${OL}${key}.json`); } catch { return null; } }
 function cleanDesc(d){
@@ -802,11 +811,11 @@ function runSummary(){}
 function freshOl(q=""){ return {q, results:[], loading:false, err:"", searched:false, picked:false, ctl:null, t:null}; }
 function olResultsHTML(){
   const o = S.ol;
-  if (o.loading) return `<p class="mini">${o.slow ? "Open Library is slow right now. Still searching (up to 15 seconds), then Google Books…" : "Searching Open Library…"}</p>`;
+  if (o.loading) return `<p class="mini">${o.slow ? `${firstName()} is slow right now. Still searching, then ${secondName()}…` : `Searching ${firstName()}…`}</p>`;
   if (o.err) return `<p class="mini">${esc(o.err)}</p>`;
   if (o.picked) return `<p class="mini ol-ok">✓ Filled in from ${esc(o.source||"Open Library")}. Check the details below.</p>`;
   if (!o.results.length) return o.searched && o.q.trim().length >= 3 ? `<p class="mini">No matches. Try fewer words, or fill in the details yourself.</p>` : "";
-  const note = o.source==="Google Books" ? `<p class="mini" style="margin:0 0 6px">Open Library didn't answer (${esc(o.olProblem||"unreachable")}), so these results are from Google Books.</p>` : "";
+  const note = o.source===secondName() ? `<p class="mini" style="margin:0 0 6px">${firstName()} didn't answer (${esc(o.olProblem||"unreachable")}), so these results are from ${secondName()}.</p>` : "";
   return note + `<div class="ol-list">${o.results.map((d,i)=>`<button type="button" class="ol-row" data-act="ol-pick" data-i="${i}">${d.cover_i?`<img src="https://covers.openlibrary.org/b/id/${encodeURIComponent(d.cover_i)}-S.jpg" alt="" loading="lazy">`:d.cover_url?`<img src="${esc(d.cover_url)}" alt="" loading="lazy">`:`<span class="ol-noc"></span>`}<span style="min-width:0"><span class="t">${esc(d.title)}</span><span class="a">${esc((d.author_name||[]).slice(0,2).join(", "))}${d.first_publish_year?` · ${d.first_publish_year}`:""}${d.number_of_pages_median?` · ${d.number_of_pages_median} pages`:""}${d.ratings_count?` · ★ ${Number(d.ratings_average).toFixed(1)}`:""}</span></span></button>`).join("")}</div>`;
 }
 async function runOlSearch(){
@@ -816,7 +825,7 @@ async function runOlSearch(){
   o.ctl = new AbortController(); o.loading = true; o.slow = false; o.err = ""; const el0=$("#olResults"); if(el0) el0.innerHTML=olResultsHTML();
   const myCtl = o.ctl; setTimeout(() => { if (o.loading && o.ctl === myCtl){ o.slow = true; const el=$("#olResults"); if(el) el.innerHTML=olResultsHTML(); } }, 4000);
   try { o.results = await olSearch(q, o.ctl.signal); o.searched = true; o.loading = false; }
-  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Open Library nor Google Books answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.${/too many/.test(e.reason||"") && !window.GOOGLE_BOOKS_KEY ? " Adding your own free Google Books key stops the \"too many requests\" problem." : ""}` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
+  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Google Books nor Open Library answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.${/too many/.test(e.reason||"") && !window.GOOGLE_BOOKS_KEY ? " Adding your own free Google Books key stops the \"too many requests\" problem." : ""}` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
   const el = $("#olResults"); if (el) el.innerHTML = olResultsHTML();
 }
 async function pickOl(i){
@@ -844,7 +853,7 @@ async function runBulkOL(){
       const cur = S.books.find(x => x.id === b.id) || b; const {id, ...rest} = cur;
       if (d){ const work = (!cur.summary || !cur.genre) ? await olWork(d.key) : null; await saveBook(id, {...rest, ...olPatch(d, work, cur, false)}); me.found++; }
       else { await saveBook(id, {...rest, olChecked: today()}); me.missed++; }
-    } catch(e){ me.err = navigator.onLine ? "Open Library and Google Books stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
+    } catch(e){ me.err = navigator.onLine ? "Google Books and Open Library stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
     me.done++; if (S.cm === me) renderModal();
     await new Promise(r => setTimeout(r, 350));
   }
@@ -864,7 +873,7 @@ function accountHTML(){
     <div class="acct">${u.photo?`<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar big">${esc((u.name||u.email||"?")[0].toUpperCase())}</span>`}<div style="min-width:0"><div style="font-weight:700">${esc(u.name||"")}</div><div class="mini">${esc(u.email||"")}</div></div></div>
     <p class="mini" style="margin:14px 0 0">Your journal syncs to every device where you sign in with this Google account. Changes made offline sync when you reconnect.</p>
     <div class="acct-list">
-      <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without Open Library details`:"Every book has been checked"}</span></button>
+      <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without covers or details yet`:"Every book has been checked"}</span></button>
       <button class="acct-row" data-act="import"><b>Import books</b><span class="mini">From Goodreads, StoryGraph or a Nightstand backup</span></button>
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
       <button class="acct-row" data-act="signout"><b>Sign out</b><span class="mini">Your books stay saved in your account</span></button>
@@ -876,7 +885,7 @@ function bulkHTML(){
   const m = S.cm; const pc = m.total ? Math.round(m.done/m.total*100) : 100;
   const head = `<div class="sheet-h"><h2>Find covers &amp; details</h2><button class="x" data-act="close" aria-label="${m.stage==="running"?"Stop":"Close"}">×</button></div>`;
   if (m.stage==="running") return head + `<div class="sheet-b"><p class="num" style="margin:0 0 10px">Checking Open Library: ${m.done} of ${m.total}</p><div class="bar" style="height:10px"><i style="width:${pc}%"></i></div><p class="hint">Matched ${m.found} so far. You can close this to stop; matches already found are saved.</p></div>`;
-  return head + `<div class="sheet-b">${m.total ? `<h3 style="font-size:22px">Done</h3><p class="num">Found ${m.found} book${m.found===1?"":"s"} on Open Library${m.missed?`. ${m.missed} had no match; open one and use <b>Find on Open Library</b> to search by hand`:""}.</p>` : `<p>Every book has already been checked against Open Library.</p>`}
+  return head + `<div class="sheet-b">${m.total ? `<h3 style="font-size:22px">Done</h3><p class="num">Found details for ${m.found} book${m.found===1?"":"s"}${m.missed?`. ${m.missed} had no match; open one and use <b>Find cover &amp; details</b> to search by hand`:""}.</p>` : `<p>Every book has already been checked.</p>`}
     ${m.err?`<div class="err">${esc(m.err)}</div>`:""}<div class="foot"><span></span><button class="btn primary" data-act="close">Close</button></div></div>`;
 }
 
