@@ -229,6 +229,7 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .tag{font-size:12.5px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 28%,transparent)}
 .community{font-size:13px;color:var(--muted);margin-top:4px}
 .community b{color:var(--ink)}
+.community a{color:var(--accent);font-weight:700}
 .cw summary{cursor:pointer;font-size:13.5px;color:var(--muted)}
 .cw p{font-size:14px;margin:6px 0 0}
 .row4{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
@@ -598,7 +599,7 @@ function dashHTML(){
   const fcol = {Print:"var(--accent)", Ebook:"var(--brass)", Audiobook:"var(--rust)"};
   const ftotal = src.length||1;
   const genres = `<section class="panel"><div class="panel-h"><h2>What you read</h2><span class="eyebrow">${y}</span></div>
-    ${onlyUnsorted ? `<p class="empty">None of this year's books have a genre yet. Imports don't include one. Use <b>Find covers &amp; details</b> in the Library to fill them in from Open Library, or add one with Edit.</p>` : ""}
+    ${onlyUnsorted ? `<p class="empty">None of this year's books have a genre yet. Imports don't include one. Use <b>Find covers &amp; details</b> in the Library to fill them in, or add one with Edit.</p>` : ""}
     ${unsorted && !onlyUnsorted ? `<p class="mini" style="margin:-4px 0 10px">${unsorted} book${unsorted===1?"":"s"} without a genre not shown.</p>` : ""}
     ${gl.length || onlyUnsorted ? `${gl.length?`<div class="hbars">${gl.map(([g,n])=>`<div class="hb"><span class="lbl" title="${esc(g)}">${esc(g)}</span><span class="trk"><i style="width:${n/gmax*100}%"></i></span><span class="n num">${n}</span></div>`).join("")}</div>`:""}
     <div class="split">${Object.entries(fm).map(([f,n])=>`<i style="width:${n/ftotal*100}%;background:${fcol[f]||"var(--muted)"}"></i>`).join("")}</div>
@@ -634,7 +635,7 @@ function libHTML(){
       <input class="search" id="q" type="search" placeholder="Search titles, authors, notes" value="${esc(S.q)}" aria-label="Search your library">
       <select class="pill" id="fGenre" aria-label="Genre"><option value="">All genres</option>${genres.map(g=>`<option ${g===S.fGenre?"selected":""}>${esc(g)}</option>`).join("")}</select>
       <select class="pill" id="fChal" aria-label="Challenge"><option value="">Any challenge status</option><option value="any" ${S.fChal==="any"?"selected":""}>In a challenge</option><option value="none" ${S.fChal==="none"?"selected":""}>Not in a challenge</option>${[...S.challenges].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(c=>`<option value="c:${esc(c.id)}" ${S.fChal==="c:"+c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
-      ${S.canWrite && S.books.some(b=>!b.olKey && !b.olChecked) ? `<button class="btn" data-act="bulk-ol">Find covers &amp; details</button>` : ""}
+      ${S.canWrite && S.books.some(needsLookup) ? `<button class="btn" data-act="bulk-ol">Find covers &amp; details</button>` : ""}
       <select class="pill" id="sort" aria-label="Sort">
         ${[["added","Recently added"],["finished","Recently finished"],["title","Title A–Z"],["author","Author A–Z"],["rating","My highest rated"],["community","Goodreads rating"]].map(([v,l])=>`<option value="${v}" ${S.sort===v?"selected":""}>${l}</option>`).join("")}
       </select>
@@ -700,7 +701,7 @@ function renderModal(){
     <div style="min-width:0">
       <h2>${esc(b.title)}</h2><div class="by">${esc(b.author||"Unknown author")}${b.series?` · <i>${esc(b.series)}</i>`:""}${b.year?` · ${esc(b.year)}`:""}</div>
       ${b.rating?`<div class="stars" style="font-size:20px">${stars(b.rating)} <span class="mini num" style="letter-spacing:0">My rating ${Number(b.rating)}/5</span></div>`:""}
-      ${b.olRating?`<div class="community num">${esc(b.ratingSource||"Open Library")} readers: <b>${Number(b.olRating).toFixed(2)}</b>${b.olRatingCount?` (${b.olRatingCount} rating${Number(b.olRatingCount)===1?"":"s"})`:""}</div>`:""}
+      ${b.olRating?`<div class="community num">${esc(b.ratingSource||"Open Library")} readers: <b>${Number(b.olRating).toFixed(2)}</b>${b.olRatingCount?` (${Number(b.olRatingCount).toLocaleString()} rating${Number(b.olRatingCount)===1?"":"s"})`:""}${b.hcSlug?` · <a href="https://hardcover.app/books/${encodeURIComponent(b.hcSlug)}" target="_blank" rel="noopener">View on Hardcover</a>`:""}</div>`:""}
       ${b.communityRating?`<div class="community num">Goodreads readers: <b>${Number(b.communityRating).toFixed(2)}</b>${b.communityAsOf?` (as of ${fmtDate(b.communityAsOf)})`:""}</div>`:""}
       ${summaryBlock(b)}
       ${S.canWrite && !b.olKey ? `<div class="block"><button class="btn" data-act="ol-lookup">Find cover &amp; details</button><span class="mini" style="margin-left:10px">Adds a cover, description and rating</span></div>` : ""}
@@ -742,7 +743,7 @@ function formHTML(){
       <div class="f full olbox"><label for="olq">Find the book</label>
         <input id="olq" type="search" placeholder="Type a title or author" value="${esc(S.ol?.q||"")}" autocomplete="off" enterkeyhint="search">
         <div id="olResults">${S.ol?olResultsHTML():""}</div>
-        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre. Searches Google Books first, then Open Library if Google Books doesn't answer.</span></div>
+        <span class="hint">Pick a match to fill in the cover, author, pages, description and genre. ${hcProxy() ? "Searches Hardcover first, then Google Books and Open Library if needed." : "Searches Google Books first, then Open Library if Google Books doesn't answer."}</span></div>
       <div class="cover-pick"><div id="coverPreview">${cover({...d,hue:h})}</div>
         <div class="f"><label>Cover</label>
           ${S.assets?`<input type="file" id="coverFile" accept="image/*"><span class="hint">${d.olCover&&!d.coverId?"Using the Open Library cover. Upload a photo to use your own copy instead.":"Snap a photo of your copy or upload the cover image."}</span>${d.coverId?`<button type="button" class="linkish" data-act="remove-cover" style="align-self:flex-start">Remove photo</button>`:""}`:`<span class="hint">Pick a color for the cover.</span>`}
@@ -763,7 +764,7 @@ function formHTML(){
       <div class="f"><label for="f-added">Date added</label><input id="f-added" name="dateAdded" type="date" value="${esc(d.dateAdded)}"></div>
       <div class="f"><label for="f-series">Series</label><input id="f-series" name="series" value="${esc(d.series||"")}" placeholder="e.g. The Empyrean, #1"></div>
       <div class="f"><label for="f-comm">Goodreads avg rating</label><input id="f-comm" name="communityRating" type="number" min="0" max="5" step="0.01" value="${esc(d.communityRating??"")}"></div>
-      <div class="f"><label for="f-moods">Moods</label><input id="f-moods" name="moods" value="${esc((d.moods||[]).join(", "))}" placeholder="emotional, hopeful, reflective"></div>
+      <div class="f"><label for="f-moods">Moods</label><input id="f-moods" name="moods" value="${esc(Array.isArray(d.moods) ? d.moods.join(", ") : String(d.moods||""))}" placeholder="emotional, hopeful, reflective"></div>
       <div class="f"><label for="f-pace">Pace</label><select id="f-pace" name="pace"><option value="">—</option>${PACES.map(p=>`<option ${p===d.pace?"selected":""}>${p}</option>`).join("")}</select></div>
       <div class="f full"><label for="f-summary">Summary</label><textarea id="f-summary" name="summary" placeholder="What the book is about, no spoilers">${esc(d.summary||"")}</textarea></div>
       <div class="f full"><label for="f-review">My review</label><textarea id="f-review" name="review" placeholder="What did you think?">${esc(d.review)}</textarea></div>
@@ -790,7 +791,8 @@ function clean(d){
     rating:n(d.rating),pages:n(d.pages),currentPage:n(d.currentPage),startDate:d.startDate||"",finishDate:d.finishDate||"",source:d.source||"",
     cost:n(d.cost),review:d.review||"",notes:d.notes||"",quote:d.quote||"",dateAdded:d.dateAdded||today(),hue:d.hue??null,coverId:d.coverId||null,
     createdAt:d.createdAt||Date.now()};
-  if (o.summary !== (S.books.find(b=>b.id===_id)?.summary||"")) o.summaryBy = o.summary ? "me" : "";
+  if (o.summary !== (S.books.find(b=>b.id===_id)?.summary||"")) o.summaryBy = !o.summary ? "" : (o.summary === (d._autoSummary||"").trim() ? d.summaryBy : "me");
+  delete o._autoSummary;
   if (o.status==="finished" && !o.finishDate) o.finishDate = today();
   if (o.status==="finished" && o.pages) o.currentPage = o.pages;
   if (o.status==="reading" && !o.startDate) o.startDate = today();
@@ -799,7 +801,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.07-f";
+const APP_VERSION = "2026.10.08-a";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -831,28 +833,59 @@ function gbToDoc(it){
 }
 const gbKey = () => window.GOOGLE_BOOKS_KEY ? `&key=${encodeURIComponent(window.GOOGLE_BOOKS_KEY)}` : "";
 async function gbSearch(q, signal, n=8){ const j = await getJSON(`${GB}?q=${encodeURIComponent(q)}&maxResults=${n}&printType=books${gbKey()}`, signal, 10000); return (j.items || []).map(gbToDoc); }
-// Which source is searched first. Google Books by default; set window.SEARCH_FIRST = "openlibrary" in config.js to flip it.
-const googleFirst = () => (window.SEARCH_FIRST || "google") !== "openlibrary";
-const firstName = () => googleFirst() ? "Google Books" : "Open Library";
-const secondName = () => googleFirst() ? "Open Library" : "Google Books";
-async function olOnly(q, signal){ const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); return j.docs || []; }
-async function olSearch(q, signal){
-  const a = googleFirst() ? () => gbSearch(q, signal) : () => olOnly(q, signal);
-  const b = googleFirst() ? () => olOnly(q, signal) : () => gbSearch(q, signal);
-  try { const r = await a(); S.ol.source = firstName(); S.ol.olProblem = ""; return r; }
-  catch(e){ if (e.name === "AbortError") throw e; S.ol.olProblem = e.reason || "unreachable";
-    try { const r = await b(); S.ol.source = secondName(); return r; }
-    catch(e2){ if (e2.name === "AbortError") throw e2; const x = new Error("both"); x.reason = `${firstName()}: ${S.ol.olProblem}; ${secondName()}: ${e2.reason || "unreachable"}`; throw x; } }
+// Search order: Hardcover (if connected), then Google Books, then Open Library.
+// Set window.SEARCH_FIRST = "openlibrary" in config.js to put Open Library ahead of Google Books.
+const hcProxy = () => String(window.HARDCOVER_PROXY || "").trim().replace(/\/$/, "");
+function sourceOrder(){
+  const rest = (window.SEARCH_FIRST || "google") === "openlibrary" ? ["Open Library","Google Books"] : ["Google Books","Open Library"];
+  return hcProxy() ? ["Hardcover", ...rest] : rest;
 }
+const firstName = () => sourceOrder()[0];
+const secondName = () => sourceOrder()[1];
+function hcToDoc(h){
+  return { key: "hc:" + h.id, title: h.title, author_name: h.authors || [], first_publish_year: h.year || "", number_of_pages_median: h.pages || "",
+    cover_url: h.cover || "", ratings_average: h.rating || "", ratings_count: h.ratings_count || "", subject: h.genres || [],
+    isbn: h.isbns || [], _desc: h.description || "", _src: "Hardcover", _moods: h.moods || [], _series: h.series || "", _color: h.cover_color || "", _slug: h.slug || "" };
+}
+async function hcSearch(q, signal, n=8){
+  let j;
+  try { j = await getJSON(`${hcProxy()}?q=${encodeURIComponent(q)}&n=${n}`, signal, 10000); }
+  catch(e){
+    if (e.name !== "AbortError" && e.status && e.status !== 429){ try { const t = await (await fetch(`${hcProxy()}?q=${encodeURIComponent(q)}&n=1`)).json(); if (t && t.error) e.reason = t.error; } catch(_){} }
+    throw e;
+  }
+  if (j && j.ok === false){ const e = new Error("hc"); e.reason = j.error || "error"; throw e; }
+  return (j.books || []).map(hcToDoc);
+}
+async function olOnly(q, signal){ const j = await getJSON(`${OL}/search.json?q=${encodeURIComponent(q)}&fields=${OL_FIELDS}&limit=8`, signal); return j.docs || []; }
+const SEARCHERS = { "Hardcover": hcSearch, "Google Books": (q, s) => gbSearch(q, s), "Open Library": olOnly };
+async function olSearch(q, signal){
+  const order = sourceOrder(); const problems = [];
+  for (let i = 0; i < order.length; i++){
+    try { const r = await SEARCHERS[order[i]](q, signal); S.ol.source = order[i]; S.ol.olProblem = problems.join("; "); S.ol.skipped = problems.length ? order.slice(0, i) : []; return r; }
+    catch(e){ if (e.name === "AbortError") throw e; const why = e.reason || "unreachable"; problems.push(why.startsWith(order[i]) ? why : `${order[i]}: ${why}`); }
+  }
+  const x = new Error("all"); x.reason = problems.join("; "); throw x;
+}
+// A book still needs a lookup if it has never been matched, or (with Hardcover connected) it was matched elsewhere and not yet checked on Hardcover.
+function needsLookup(b){ if (!b.title) return false; if (!b.olKey) return !b.olChecked; return !!hcProxy() && !String(b.olKey).startsWith("hc:") && !b.hcChecked; }
+const normT = t => String(t||"").toLowerCase().replace(/\(.*?\)/g,"").split(":")[0].replace(/[^a-z0-9]/g,"");
+async function hcFind(title, author){ const r = await hcSearch(`${title} ${author||""}`.trim(), null, 3); return r.find(d => normT(d.title).slice(0,12) === normT(title).slice(0,12)) || null; }
 async function olSearchBook(title, author){
   const t = String(title).replace(/\(.*?\)/g,"").split(":")[0].trim();
-  const gb = async () => (await gbSearch(`intitle:${t}${author?` inauthor:${author}`:""}`, null, 1))[0] || null;
-  const ol = async () => (await getJSON(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`)).docs?.[0] || null;
-  const [a, b] = googleFirst() ? [gb, ol] : [ol, gb];
-  try { const r = await a(); if (r) return r; } catch(_) {}
-  return await b();
+  const tries = {
+    "Hardcover": () => hcFind(t, author),
+    "Google Books": async () => (await gbSearch(`intitle:${t}${author?` inauthor:${author}`:""}`, null, 1))[0] || null,
+    "Open Library": async () => (await getJSON(`${OL}/search.json?title=${encodeURIComponent(t)}${author?`&author=${encodeURIComponent(author)}`:""}&fields=${OL_FIELDS}&limit=3`)).docs?.[0] || null
+  };
+  let lastErr = null;
+  for (const src of sourceOrder()){
+    try { const r = await tries[src](); if (r) return r; } catch(e){ lastErr = e; }
+  }
+  if (lastErr && !navigator.onLine) throw lastErr;
+  return null;
 }
-async function olWork(key){ if (!key || String(key).startsWith("gb:")) return null; try { return await getJSON(`${OL}${key}.json`); } catch { return null; } }
+async function olWork(key){ if (!key || /^(gb|hc):/.test(String(key))) return null; try { return await getJSON(`${OL}${key}.json`); } catch { return null; } }
 function cleanDesc(d){
   let t = typeof d === "string" ? d : (d && d.value) || "";
   t = t.split(/\n\s*-{3,}|\n\s*\*{3,}|\(\[source\]/)[0];
@@ -883,11 +916,17 @@ function olPatch(d, work, base, overwrite){
   const rawDesc = work ? work.description : d._desc;
   if (rawDesc){ const desc = cleanDesc(rawDesc); if (desc && !base.summary){ p.summary = desc; p.summaryBy = d._src || "Open Library"; } }
   const g = guessGenre((work && work.subjects) || d.subject); if (g && !base.genre) p.genre = g;
+  if (d._moods && d._moods.length && !(base.moods && base.moods.length)) p.moods = d._moods.slice(0, 8).map(m => String(m).toLowerCase());
+  if (d._series && !base.series) p.series = d._series;
+  if (d._slug) p.hcSlug = d._slug;
+  if (d._color && d.cover_url && !(base.coverId)) { const c = d._color; const r = parseInt(c.slice(1,3),16), gg = parseInt(c.slice(3,5),16), bb = parseInt(c.slice(5,7),16);
+    p.spineColor = c; p.spineText = (0.2126*r + 0.7152*gg + 0.0722*bb)/255 > .58 ? "#1c1c1c" : "#fbf7ee"; p.spineFor = d.cover_url; }
+  if (d._src === "Hardcover" && d.cover_url) p.olCover = base.olCover && !overwrite ? base.olCover : "";
   return p;
 }
 function summaryBlock(b){
   if (!b.summary) return "";
-  const by = b.summaryBy === "Open Library" ? "From Open Library" : b.summaryBy === "Google Books" ? "From Google Books" : b.summaryBy === "Claude" ? "Written by Claude" : b.summaryBy === "me" ? "Written by you" : "";
+  const by = b.summaryBy === "Open Library" ? "From Open Library" : b.summaryBy === "Google Books" ? "From Google Books" : b.summaryBy === "Hardcover" ? "From Hardcover" : b.summaryBy === "Claude" ? "Written by Claude" : b.summaryBy === "me" ? "Written by you" : "";
   return `<div class="block"><div class="eyebrow">Summary</div><div class="summary-box"><p>${esc(b.summary)}</p>${by?`<div class="byline"><span>${by}</span></div>`:""}</div></div>`;
 }
 function runSummary(){}
@@ -898,7 +937,7 @@ function olResultsHTML(){
   if (o.err) return `<p class="mini">${esc(o.err)}</p>`;
   if (o.picked) return `<p class="mini ol-ok">✓ Filled in from ${esc(o.source||"Open Library")}. Check the details below.</p>`;
   if (!o.results.length) return o.searched && o.q.trim().length >= 3 ? `<p class="mini">No matches. Try fewer words, or fill in the details yourself.</p>` : "";
-  const note = o.source===secondName() ? `<p class="mini" style="margin:0 0 6px">${firstName()} didn't answer (${esc(o.olProblem||"unreachable")}), so these results are from ${secondName()}.</p>` : "";
+  const note = o.source && o.source!==firstName() ? `<p class="mini" style="margin:0 0 6px">${esc((o.skipped||[]).join(" and "))} didn't answer (${esc(o.olProblem||"unreachable")}), so these results are from ${esc(o.source)}.</p>` : "";
   return note + `<div class="ol-list">${o.results.map((d,i)=>`<button type="button" class="ol-row" data-act="ol-pick" data-i="${i}">${d.cover_i?`<img src="https://covers.openlibrary.org/b/id/${encodeURIComponent(d.cover_i)}-S.jpg" alt="" loading="lazy">`:d.cover_url?`<img src="${esc(d.cover_url)}" alt="" loading="lazy">`:`<span class="ol-noc"></span>`}<span style="min-width:0"><span class="t">${esc(d.title)}</span><span class="a">${esc((d.author_name||[]).slice(0,2).join(", "))}${d.first_publish_year?` · ${d.first_publish_year}`:""}${d.number_of_pages_median?` · ${d.number_of_pages_median} pages`:""}${d.ratings_count?` · ★ ${Number(d.ratings_average).toFixed(1)}`:""}</span></span></button>`).join("")}</div>`;
 }
 async function runOlSearch(){
@@ -908,7 +947,7 @@ async function runOlSearch(){
   o.ctl = new AbortController(); o.loading = true; o.slow = false; o.err = ""; const el0=$("#olResults"); if(el0) el0.innerHTML=olResultsHTML();
   const myCtl = o.ctl; setTimeout(() => { if (o.loading && o.ctl === myCtl){ o.slow = true; const el=$("#olResults"); if(el) el.innerHTML=olResultsHTML(); } }, 4000);
   try { o.results = await olSearch(q, o.ctl.signal); o.searched = true; o.loading = false; }
-  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `Neither Google Books nor Open Library answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.${/too many/.test(e.reason||"") && !window.GOOGLE_BOOKS_KEY ? " Adding your own free Google Books key stops the \"too many requests\" problem." : ""}` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
+  catch(e){ if (e.name === "AbortError") return; o.loading = false; o.results = []; o.err = navigator.onLine ? `No book source answered (${e.reason || "unreachable"}). Try again in a moment, or fill in the details yourself.${/too many/.test(e.reason||"") && !window.GOOGLE_BOOKS_KEY ? " Adding your own free Google Books key stops the \"too many requests\" problem." : ""}` : "You're offline, so Open Library can't be searched. You can still fill in the details yourself."; }
   const el = $("#olResults"); if (el) el.innerHTML = olResultsHTML();
 }
 async function pickOl(i){
@@ -916,6 +955,7 @@ async function pickOl(i){
   readForm();
   const isNew = S.openId === "new";
   Object.assign(S.draft, olPatch(d, null, S.draft, isNew));
+  if (S.draft.summaryBy && S.draft.summaryBy !== "me") S.draft._autoSummary = S.draft.summary;
   S.ol.picked = true; renderModal();
   if (d._src) return;
   const work = await olWork(d.key);
@@ -923,20 +963,27 @@ async function pickOl(i){
   readForm();
   const extra = olPatch(d, work, S.draft, false);
   ["summary","summaryBy","genre"].forEach(k => { if (extra[k] !== undefined) S.draft[k] = extra[k]; });
+  if (extra.summary) S.draft._autoSummary = extra.summary;
   renderModal();
 }
 async function runBulkOL(){
-  const todo = S.books.filter(b => !b.olKey && !b.olChecked && b.title);
+  const todo = S.books.filter(needsLookup);
   S.cm = {type:"bulk", done:0, total:todo.length, found:0, missed:0, stage: todo.length ? "running" : "done", err:""}; renderModal();
   const me = S.cm;
   for (const b of todo){
     if (S.cm !== me) return;
     try {
-      const d = await olSearchBook(b.title, b.author);
       const cur = S.books.find(x => x.id === b.id) || b; const {id, ...rest} = cur;
-      if (d){ const work = (!cur.summary || !cur.genre) ? await olWork(d.key) : null; await saveBook(id, {...rest, ...olPatch(d, work, cur, false)}); me.found++; }
-      else { await saveBook(id, {...rest, olChecked: today()}); me.missed++; }
-    } catch(e){ me.err = navigator.onLine ? "Google Books and Open Library stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
+      const upgrade = !!cur.olKey; // already matched elsewhere: only ask Hardcover
+      const d = upgrade ? await hcFind(String(cur.title).replace(/\(.*?\)/g,"").split(":")[0].trim(), cur.author) : await olSearchBook(cur.title, cur.author);
+      if (d){
+        const work = (!cur.summary || !cur.genre) ? await olWork(d.key) : null;
+        const p = olPatch(d, work, cur, false);
+        if (upgrade && d.cover_url && !cur.coverId){ p.coverUrl = d.cover_url; p.olCover = ""; }
+        await saveBook(id, {...rest, ...p}); me.found++;
+      }
+      else { await saveBook(id, {...rest, ...(upgrade ? {hcChecked: today()} : {olChecked: today()})}); me.missed++; }
+    } catch(e){ me.err = navigator.onLine ? "The book sources stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
     me.done++; if (S.cm === me) renderModal();
     await new Promise(r => setTimeout(r, 350));
   }
@@ -950,7 +997,7 @@ function downloadBackup(){
   toast("Backup downloaded");
 }
 function accountHTML(){
-  const u = S.user || {}; const need = S.books.filter(b=>!b.olKey && !b.olChecked).length;
+  const u = S.user || {}; const need = S.books.filter(needsLookup).length;
   return `<div class="sheet-h"><h2>Your Nightstand</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b">
     <div class="acct">${u.photo?`<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar big">${esc((u.name||u.email||"?")[0].toUpperCase())}</span>`}<div style="min-width:0"><div style="font-weight:700">${esc(u.name||"")}</div><div class="mini">${esc(u.email||"")}</div></div></div>
@@ -961,7 +1008,7 @@ function accountHTML(){
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
       <button class="acct-row" data-act="signout"><b>Sign out</b><span class="mini">Your books stay saved in your account</span></button>
     </div>
-    <p class="mini" style="margin:12px 0 0">Nightstand version ${APP_VERSION} · Google Books key ${window.GOOGLE_BOOKS_KEY ? "added" : "not added"}</p>
+    <p class="mini" style="margin:12px 0 0">Nightstand version ${APP_VERSION} · Hardcover ${hcProxy() ? "connected" : "not connected"} · Google Books key ${window.GOOGLE_BOOKS_KEY ? "added" : "not added"}</p>
   </div>`;
 }
 function bulkHTML(){
