@@ -437,7 +437,8 @@ const SPINE_FONTS = {
   hand:    {label:"Handwritten",   adv:.44, boost:3}
 };
 // Auto width follows the page count: thin for short books, chunky for long ones
-function autoWidth(b){ const pages = Number(b.pages) || 300; return Math.round(Math.max(14, Math.min(60, 9 + pages / 14))); }
+// Square-root scale: a big book is still visibly thicker, but doubling the pages doesn't double the width
+function autoWidth(b){ const pages = Number(b.pages) || 300; return Math.round(Math.max(14, Math.min(42, 4 + 1.3 * Math.sqrt(pages)))); }
 function autoHeight(b){ return 106 + (hash(String(b.title||"")) % 20); }
 function spineLayout(b){
   const title = String(b.title || "Untitled");
@@ -447,7 +448,12 @@ function spineLayout(b){
   const need = fs => { const per = Math.max(4, Math.floor(len / (fs * font.adv))); const cols = Math.ceil(title.length / per); return {cols, w: cols * fs * 1.12 + 9}; };
   let fs = (title.length > 44 ? 9.5 : 10.5) + font.boost, w;
   if (Number(b.spineW)) { w = Number(b.spineW); while (fs > 7 && need(fs).w > w) fs -= .5; }
-  else { while (fs > 7.5 && need(fs).cols > 4) fs -= .5; w = Math.min(80, Math.max(autoWidth(b), Math.round(need(fs).w))); }
+  else {
+    const w0 = autoWidth(b);
+    while (fs > 8.5 && need(fs).w > w0) fs -= .5;          // shrink the lettering a little before widening
+    while (fs > 7.5 && need(fs).w > 42) fs -= .5;
+    w = Math.min(42, Math.max(w0, Math.round(need(fs).w)));
+  }
   return {title, fk, ht, fs, w};
 }
 function spine(b, i){
@@ -970,7 +976,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-d";
+const APP_VERSION = "2026.10.08-e";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
