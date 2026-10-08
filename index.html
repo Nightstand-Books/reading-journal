@@ -132,6 +132,32 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .shelf .slot.dragging{opacity:.55}
 .shelf .slot.dragging .spine{transform:translateY(-10px)}
 .arrange-hint{font-size:13px;color:var(--muted);margin:-4px 0 10px}
+.bookcase{border:8px solid var(--wood1);border-top-width:10px;border-bottom-width:6px;border-radius:6px;background:var(--shelf-back);box-shadow:0 10px 20px -14px rgba(0,0,0,.55)}
+.bookcase .shelf{border-radius:0;box-shadow:none;min-height:152px;padding:0 8px}
+.bookcase .shelf-head{margin:10px 8px 2px}
+.shelf-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px}
+.shelf.editing{outline:1px dashed color-mix(in srgb,var(--muted) 55%,transparent);outline-offset:-4px}
+.shelf.target{outline:2px solid color-mix(in srgb,var(--brass) 75%,transparent)}
+.shelf-drop{height:136px;display:flex;align-items:center;margin:0 auto;color:var(--muted);font-size:13px;font-style:italic}
+.slot.deco svg{display:block;max-width:none}
+.slot.bookend{margin:0 1px}
+.slot.gap{width:var(--gw)}
+.shelf.editing .slot.gap{background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--muted) 30%,transparent) 6px 7px);background-clip:content-box}
+.shelf.editing .slot[data-item]{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.shelf.editing .spine:hover{transform:none}
+.slot.sel .spine,.slot.sel svg{outline:2px solid var(--brass);outline-offset:2px}
+.slot.gap.sel{outline:2px solid var(--brass);outline-offset:-2px}
+.slot.dragging{opacity:.5}
+.tray{margin-top:14px}
+.tray-row{border-radius:8px;box-shadow:inset 0 0 0 1px var(--line);margin-top:6px;padding:0 8px;min-height:152px}
+.shelf-tools{display:flex;gap:8px;flex-wrap:wrap;margin:-2px 0 12px}
+.itembar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.deco-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.deco-tile{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;padding:12px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);cursor:pointer;min-height:140px}
+.deco-tile:hover,.deco-tile:focus-visible{border-color:var(--brass)}
+.deco-tile svg{max-height:96px;width:auto}
+.deco-tile .pair{display:flex;gap:18px;align-items:flex-end}
+.deco-tile>span:last-child{font-size:12.5px}
 .spine-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;font-size:13px}
 .spine-ctl input[type=color]{width:38px;height:30px;padding:0 2px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer}
 .plant{width:46px;height:auto;display:block}
@@ -458,10 +484,10 @@ function spineLayout(b){
   }
   return {title, fk, ht, fs, w};
 }
-function spine(b, i){
+function spine(b, i, attrs="", extra=""){
   const L = spineLayout(b);
   const bg = spineHexOf(b), tc = b.spineTextColor || textOn(bg);
-  return `<div class="slot" data-id="${esc(b.id)}"><button class="spine cc ff-${L.fk}" style="--h:${hueOf(b)};--w:${L.w}px;--ht:${L.ht}px;--fs:${L.fs}px;--c:${bg};--ct:${tc}" data-act="${S.arranging?"noop":"open"}" data-id="${esc(b.id)}" title="${esc(L.title)}${b.author?" by "+esc(b.author):""}"><span>${esc(L.title)}</span></button></div>`;
+  return `<div class="slot${extra}" data-id="${esc(b.id)}" ${attrs}><button class="spine cc ff-${L.fk}" style="--h:${hueOf(b)};--w:${L.w}px;--ht:${L.ht}px;--fs:${L.fs}px;--c:${bg};--ct:${tc}" data-act="${S.shelfEdit?"noop":"open"}" data-id="${esc(b.id)}" title="${esc(L.title)}${b.author?" by "+esc(b.author):""}"><span>${esc(L.title)}</span></button></div>`;
 }
 function textOn(hex){ const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), bb=parseInt(hex.slice(5,7),16); return (0.2126*r+0.7152*g+0.0722*bb)/255 > .58 ? "#1c1c1c" : "#fbf7ee"; }
 function hslHex(h, s, l){ s/=100; l/=100; const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))); return "#"+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join(""); }
@@ -475,6 +501,123 @@ function yearsAvailable(){
   return [...ys].sort((a,b)=>b-a);
 }
 function finishedIn(y){ return S.books.filter(b => b.status==="finished" && yr(b.finishDate)===y).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
+
+/* ---------- bookcase: shelves, decor, bookends ---------- */
+const DECOR = {
+  plant:     {label:"Potted plant", w:46, h:70, svg:'<path d="M23 44 C10 40 4 30 6 18 C14 22 20 30 23 44Z" fill="#4f8a5f"/><path d="M23 44 C34 38 42 28 40 14 C31 20 25 30 23 44Z" fill="#3f7550"/><path d="M23 44 C20 30 22 16 28 6 C31 18 28 32 23 44Z" fill="#5f9c6c"/><path d="M11 44 H35 L32 68 H14 Z" fill="#b8693f"/><rect x="9" y="42" width="28" height="6" rx="2" fill="#c97a4c"/>'},
+  succulent: {label:"Succulent", w:52, h:46, svg:'<path d="M10 28h32l-4 17H14z" fill="#c97a4c"/><rect x="8" y="25" width="36" height="6" rx="2" fill="#d98c5e"/><g fill="#86b48d"><ellipse cx="26" cy="15" rx="5" ry="11"/><ellipse cx="17" cy="19" rx="4.5" ry="9.5" transform="rotate(-40 17 19)"/><ellipse cx="35" cy="19" rx="4.5" ry="9.5" transform="rotate(40 35 19)"/></g><g fill="#5f9469"><ellipse cx="12" cy="24" rx="3.5" ry="7.5" transform="rotate(-70 12 24)"/><ellipse cx="40" cy="24" rx="3.5" ry="7.5" transform="rotate(70 40 24)"/><ellipse cx="26" cy="21" rx="4" ry="6.5"/></g>'},
+  cactus:    {label:"Cactus", w:40, h:84, svg:'<rect x="15" y="10" width="11" height="54" rx="5.5" fill="#5f9469"/><path d="M15 42h-5a3 3 0 0 1-3-3V27a3 3 0 0 1 6 0v9h2z" fill="#5f9469"/><path d="M26 36h4a3 3 0 0 0 3-3V21a3 3 0 0 0-6 0v9h-1z" fill="#6fa37a"/><path d="M20.5 13v49" stroke="#4a7a55" stroke-width="1.2"/><circle cx="20.5" cy="9" r="3" fill="#e58aa0"/><path d="M6 62h28l-3 22H9z" fill="#e0d2b8"/><rect x="4" y="59" width="32" height="6" rx="2" fill="#ece0c8"/>'},
+  vase:      {label:"Eucalyptus vase", w:36, h:100, svg:'<g stroke="#6b8f7a" stroke-width="1.4" fill="none"><path d="M18 62C17 40 12 24 6 8"/><path d="M18 62C19 38 24 20 30 4"/><path d="M18 62C18 44 18 28 17 14"/></g><g fill="#9cb8a6"><ellipse cx="7" cy="12" rx="3.2" ry="2.4"/><ellipse cx="10" cy="21" rx="3.2" ry="2.4"/><ellipse cx="13" cy="31" rx="3.2" ry="2.4"/><ellipse cx="15" cy="42" rx="3.2" ry="2.4"/><ellipse cx="29" cy="8" rx="3.2" ry="2.4"/><ellipse cx="26" cy="17" rx="3.2" ry="2.4"/><ellipse cx="24" cy="27" rx="3.2" ry="2.4"/><ellipse cx="21" cy="38" rx="3.2" ry="2.4"/><ellipse cx="17" cy="17" rx="2.6" ry="3.2"/><ellipse cx="18" cy="28" rx="2.6" ry="3.2"/><ellipse cx="18" cy="40" rx="2.6" ry="3.2"/><ellipse cx="19" cy="51" rx="2.6" ry="3.2"/></g><path d="M11 58h14c2 6 4 10 4 18 0 12-5 23-11 23S7 88 7 76c0-8 2-12 4-18z" fill="#a9cdd2" opacity=".85"/><path d="M12 60h12" stroke="#7fa9b0" stroke-width="2"/>'},
+  candle:    {label:"Candle", w:34, h:52, svg:'<path d="M17 3c3.5 4.5 4.5 8 0 12-4.5-4-3.5-7.5 0-12z" fill="#f2b84b"/><path d="M17 7.5c1.5 2 2 4 0 6-2-2-1.5-4 0-6z" fill="#fff1c4"/><rect x="16.3" y="14" width="1.4" height="5" fill="#3a2e22"/><rect x="5" y="18" width="24" height="33" rx="3" fill="#e9dcc3"/><rect x="5" y="18" width="24" height="5" rx="2" fill="#f4ead6"/><rect x="5" y="31" width="24" height="10" fill="#c6a46a"/>'},
+  mug:       {label:"Coffee mug", w:46, h:44, svg:'<g stroke="#b9b2a4" stroke-width="2" fill="none" stroke-linecap="round"><path d="M14 3c-3 3 3 5 0 9"/><path d="M22 1c-3 3 3 5 0 9"/></g><path d="M34 22h3a6 6 0 0 1 0 12h-3" fill="none" stroke="#2d5b44" stroke-width="4"/><path d="M6 15h30v21a8 8 0 0 1-8 8H14a8 8 0 0 1-8-8z" fill="#2d5b44"/><path d="M12 24h18" stroke="#86bb99" stroke-width="2.5" stroke-linecap="round"/>'},
+  stack:     {label:"Book stack", w:60, h:40, svg:'<rect x="4" y="28" width="54" height="12" rx="1.5" fill="#7b3b36"/><rect x="4" y="31" width="54" height="2" fill="#c9a24a" opacity=".7"/><rect x="8" y="17" width="46" height="11" rx="1.5" fill="#2f5e78"/><rect x="2" y="6" width="50" height="11" rx="1.5" fill="#d8c79c"/><rect x="2" y="9" width="50" height="1.5" fill="#8a6d3b" opacity=".6"/><rect x="50" y="7" width="2" height="9" fill="#efe6cf"/>'},
+  lamp:      {label:"Reading lamp", w:44, h:96, svg:'<path d="M8 34h28l-6-30H14z" fill="#ede2c4"/><path d="M8 34h28" stroke="#d6c69c" stroke-width="2"/><rect x="20.5" y="34" width="3" height="52" fill="#c9a24a"/><rect x="8" y="86" width="28" height="10" rx="3" fill="#b88a32"/>'},
+  frame:     {label:"Picture frame", w:50, h:62, svg:'<rect x="3" y="3" width="44" height="59" rx="2" fill="#6b4427"/><rect x="8" y="8" width="34" height="49" fill="#f3ead8"/><rect x="11" y="11" width="28" height="43" fill="#a9c9d6"/><circle cx="31" cy="21" r="4" fill="#f2d27a"/><path d="M11 54l9-17 6 9 5-6 8 14z" fill="#5f9469"/>'},
+  globe:     {label:"Globe", w:48, h:80, svg:'<circle cx="24" cy="30" r="19" fill="#7fb2c8"/><path d="M12 22c4-2 8 0 9 4s-3 6-2 10 4 4 2 8c-4-1-9-6-10-11s-1-8 1-11zM28 14c5 0 9 3 10 7s-2 5-5 4-4 3-7 1 0-6-2-8 1-4 4-4z" fill="#6e9b5a"/><path d="M24 8a22 22 0 0 1 0 44" fill="none" stroke="#b88a32" stroke-width="2.5"/><rect x="22.5" y="52" width="3" height="17" fill="#b88a32"/><path d="M12 80c0-6 5-10 12-10s12 4 12 10z" fill="#8a6524"/>'},
+  hourglass: {label:"Hourglass", w:32, h:56, svg:'<rect x="3" y="2" width="26" height="5" rx="1.5" fill="#7b502f"/><rect x="3" y="51" width="26" height="5" rx="1.5" fill="#7b502f"/><rect x="5" y="7" width="2.5" height="44" fill="#5b3a20"/><rect x="24.5" y="7" width="2.5" height="44" fill="#5b3a20"/><path d="M9 7h14c0 9-5 13-6 22 1 9 6 13 6 22H9c0-9 5-13 6-22-1-9-6-13-6-22z" fill="#dfe9ec" opacity=".85"/><path d="M11 51h10c-1-5-3-8-5-10-2 2-4 5-5 10z" fill="#e2b866"/><path d="M12 14h8c-1 3-2.5 5-4 7-1.5-2-3-4-4-7z" fill="#e2b866"/>'},
+  cat:       {label:"Sleeping cat", w:62, h:38, svg:'<path d="M55 33c6 2 6-8-1-7" fill="none" stroke="#3b3534" stroke-width="5" stroke-linecap="round"/><ellipse cx="32" cy="27" rx="25" ry="11" fill="#3b3534"/><circle cx="13" cy="22" r="9.5" fill="#3b3534"/><path d="M5 17l1-10 6 6zM15 13l5-7 2 9z" fill="#3b3534"/><path d="M8.5 23q2 1.6 4 0M15 23q2 1.6 4 0" stroke="#d9c79a" stroke-width="1.1" fill="none" stroke-linecap="round"/>'}
+};
+// Drawn as the LEFT bookend (books lean against its right side); flipped for the right end
+const BOOKENDS = {
+  metal:  {label:"Classic metal", w:22, h:88, svg:'<rect x="14" y="2" width="6" height="86" rx="1" fill="#2b2b2b"/><rect x="1" y="82" width="21" height="6" rx="1" fill="#1d1d1d"/>'},
+  wood:   {label:"Wood block", w:26, h:72, svg:'<rect x="1" y="2" width="24" height="70" rx="3" fill="#a06a3c"/><path d="M6 8c4 10-2 20 2 30s-2 18 2 30M14 6c3 12-3 24 1 34s-2 18 1 28M20 10c2 10-2 22 1 32" stroke="#7d4f2a" stroke-width="1.2" fill="none"/>'},
+  marble: {label:"Marble arch", w:34, h:74, svg:'<path d="M33 74V4A31 31 0 0 0 2 35v39z" fill="#e8e4dc"/><path d="M8 30c6 4 8 10 16 12M6 52c8-2 12 4 20 2M20 14c2 6 8 8 12 6" stroke="#b9b3a8" stroke-width="1" fill="none"/>'},
+  cat:    {label:"Cat", w:32, h:82, svg:'<path d="M26 80c7-2 7-11 0-13" stroke="#2b2b2b" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M5 82c-2-15 0-27 6-35-3-4-4-9-3-14l-2-10 6 6h7l6-6-2 10c1 5 0 10-3 14 6 8 8 20 6 35z" fill="#2b2b2b"/><circle cx="12" cy="31" r="1.4" fill="#d6aa55"/><circle cx="19" cy="31" r="1.4" fill="#d6aa55"/>'},
+  moon:   {label:"Moon", w:34, h:82, svg:'<rect x="9" y="54" width="4" height="20" fill="#b88a32"/><path d="M24 12A24 24 0 0 0 24 60A30 30 0 0 1 24 12Z" fill="#d6aa55"/><circle cx="28" cy="24" r="1.6" fill="#f3e2b0"/><circle cx="31" cy="34" r="1.1" fill="#f3e2b0"/><circle cx="27" cy="44" r="1.3" fill="#f3e2b0"/><rect x="2" y="72" width="30" height="10" rx="2" fill="#7b502f"/>'}
+};
+const shelfUid = () => Math.random().toString(36).slice(2, 9);
+function pushInside(row, item){ const n = row.length; if (n && row[n-1].t === "e" && row[n-1].f) row.splice(n - 1, 0, item); else row.push(item); }
+let layoutSaveTimer = null;
+// Layout for a year: { rows: [[item, ...], ...], tray: [bookId, ...] }
+// item: {t:"b", id} book · {t:"d", k, u} decor · {t:"e", k, f, u} bookend (f = flipped) · {t:"g", w, u} empty space
+function shelfLayout(y){
+  const fin = finishedIn(y), ids = new Set(fin.map(b => b.id));
+  const saved = S.settings.shelves && S.settings.shelves[y];
+  let rows, tray;
+  if (saved && Array.isArray(saved.rows)){
+    rows = saved.rows.map(r => (r.items || []).filter(it => it && (it.t !== "b" || ids.has(it.id))));
+    tray = (saved.tray || []).filter(id => ids.has(id));
+  } else {
+    const ord = (S.settings.shelfOrder && S.settings.shelfOrder[y]) || [];
+    const pos = id => { const i = ord.indexOf(id); return i < 0 ? 1e6 : i; };
+    const books = [...fin].sort((a,b) => pos(a.id) - pos(b.id) || (a.finishDate||"").localeCompare(b.finishDate||""));
+    rows = [[...books.map(b => ({t:"b", id:b.id})), {t:"d", k:"plant", u:"plant0"}]];
+    tray = [];
+  }
+  if (!rows.length) rows = [[]];
+  const placed = new Set(tray); rows.forEach(r => r.forEach(it => { if (it.t === "b") placed.add(it.id); }));
+  const missing = [...fin].sort((a,b) => (a.finishDate||"").localeCompare(b.finishDate||"")).filter(b => !placed.has(b.id));
+  if (missing.length){
+    const last = rows[rows.length - 1]; let at = last.length;
+    while (at > 0 && (last[at-1].t === "d" || (last[at-1].t === "e" && last[at-1].f))) at--;   // keep new books inside the bookend / before trailing decor
+    last.splice(at, 0, ...missing.map(b => ({t:"b", id:b.id})));
+  }
+  return {rows, tray};
+}
+function saveLayout(y, L){
+  const shelves = {...(S.settings.shelves || {}), [y]: {rows: L.rows.map(r => ({items: r})), tray: L.tray}};
+  S.settings = {...S.settings, shelves};
+  clearTimeout(layoutSaveTimer);
+  layoutSaveTimer = setTimeout(() => { S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err))); }, 350);
+}
+function decoSVG(def, flip){ return `<svg viewBox="0 0 ${def.w} ${def.h}" width="${def.w}" height="${def.h}" aria-hidden="true"${flip?' style="transform:scaleX(-1)"':""}>${def.svg}</svg>`; }
+function itemHTML(it, key, byId){
+  const sel = S.shelfEdit && S.shelfSel === key ? " sel" : "";
+  const attrs = `data-k="${esc(key)}" data-item="${esc(JSON.stringify(it))}"`;
+  if (it.t === "b"){ const b = byId.get(it.id); return b ? spine(b, 0, attrs, sel) : ""; }
+  if (it.t === "d"){ const d = DECOR[it.k]; return d ? `<div class="slot deco${sel}" ${attrs} title="${esc(d.label)}">${decoSVG(d)}</div>` : ""; }
+  if (it.t === "e"){ const d = BOOKENDS[it.k]; return d ? `<div class="slot deco bookend${sel}" ${attrs} title="${esc(d.label)} bookend">${decoSVG(d, it.f)}</div>` : ""; }
+  if (it.t === "g") return `<div class="slot gap${sel}" ${attrs} style="--gw:${Math.max(8, Math.min(200, Number(it.w)||24))}px"${S.shelfEdit?' title="Empty space"':' aria-hidden="true"'}></div>`;
+  return "";
+}
+function bookcaseHTML(y, fin){
+  const L = shelfLayout(y), byId = new Map(fin.map(b => [b.id, b])), ed = S.shelfEdit;
+  if (S.shelfTarget == null || S.shelfTarget >= L.rows.length) S.shelfTarget = L.rows.length - 1;
+  const rows = L.rows.map((row, r) => {
+    const items = row.map((it, i) => itemHTML(it, `${r}:${i}`, byId)).join("");
+    const head = ed ? `<div class="shelf-head"><b>Shelf ${r+1}</b>${S.shelfTarget===r?`<span class="sc-tag">New items go here</span>`:`<button class="linkish" data-act="shelf-target" data-r="${r}">Add new items here</button>`}${L.rows.length>1?`<button class="linkish" data-act="shelf-remove" data-r="${r}">Remove shelf</button>`:""}</div>` : "";
+    const empty = !fin.length && !ed && r === 0 && !row.some(it => it.t !== "b") ? `<div class="shelf-empty">Finish a book in ${y} and its spine lands here.</div>` : "";
+    return `${head}<div class="shelf${ed?" editing":""}${ed && S.shelfTarget===r?" target":""}" data-row="${r}">${items}${empty}${ed && !items ? `<div class="shelf-drop">Drag books or decor here</div>` : ""}</div>`;
+  }).join("");
+  const tray = ed ? `<div class="tray"><div class="shelf-head"><b>Off the shelf</b><span class="mini">Drag books here to take them off. Drag decor here to remove it.</span></div>
+      <div class="shelf tray-row editing" data-row="tray">${L.tray.map(id => itemHTML({t:"b", id}, "t:" + id, byId)).join("") || `<div class="shelf-drop">Nothing here</div>`}</div></div>` : "";
+  return `<div class="bookcase${ed?" editing":""}" id="bookcase">${rows}</div>${tray}`;
+}
+function shelfToolsHTML(){
+  return `<div class="shelf-tools"><button class="btn" data-act="shelf-add">+ Add shelf</button><button class="btn" data-act="deco-open" data-tab="decor">Add decor</button><button class="btn" data-act="deco-open" data-tab="ends">Add bookends</button><button class="btn" data-act="gap-add">Add empty space</button></div>`;
+}
+function itemBarHTML(y){
+  const L = shelfLayout(y), key = S.shelfSel;
+  if (!key) return `<p class="arrange-hint" style="margin-top:10px">Drag anything to move it, even onto another shelf. Tap an item for more options.</p>`;
+  let it, label;
+  if (key.startsWith("t:")) { const b = S.books.find(x => x.id === key.slice(2)); if (!b){ S.shelfSel = null; return ""; }
+    return `<div class="itembar"><b>${esc(b.title)}</b><span class="mini">Off the shelf</span><button class="btn" data-act="sel-puton">Put on shelf ${S.shelfTarget+1}</button><button class="btn ghost" data-act="sel-clear">Close</button></div>`; }
+  const [r, i] = key.split(":").map(Number); it = L.rows[r] && L.rows[r][i]; if (!it){ S.shelfSel = null; return ""; }
+  label = it.t === "b" ? (S.books.find(x => x.id === it.id)?.title || "Book") : it.t === "d" ? DECOR[it.k]?.label : it.t === "e" ? BOOKENDS[it.k]?.label + " bookend" : "Empty space";
+  const move = `<button class="btn" data-act="sel-move" data-d="-1" aria-label="Move left">◀</button><button class="btn" data-act="sel-move" data-d="1" aria-label="Move right">▶</button>`;
+  const extra = it.t === "b" ? `<button class="btn" data-act="sel-off">Take off shelf</button><button class="btn ghost" data-act="open" data-id="${esc(it.id)}">Open book</button>`
+    : it.t === "e" ? `<button class="btn" data-act="sel-flip">Flip</button><button class="btn danger" data-act="sel-remove">Remove</button>`
+    : it.t === "g" ? `<button class="btn" data-act="sel-gap" data-d="-8">Narrower</button><button class="btn" data-act="sel-gap" data-d="8">Wider</button><button class="btn danger" data-act="sel-remove">Remove</button>`
+    : `<button class="btn danger" data-act="sel-remove">Remove</button>`;
+  return `<div class="itembar"><b>${esc(label)}</b><span class="mini">Shelf ${r+1}</span>${move}${extra}<button class="btn ghost" data-act="sel-clear">Close</button></div>`;
+}
+function decoPaletteHTML(){
+  const tab = S.cm.tab === "ends" ? "ends" : "decor";
+  const tiles = tab === "decor"
+    ? Object.entries(DECOR).map(([k,d]) => `<button class="deco-tile" data-act="deco-add" data-k="${k}">${decoSVG(d)}<span>${esc(d.label)}</span></button>`).join("")
+    : Object.entries(BOOKENDS).map(([k,d]) => `<button class="deco-tile" data-act="end-add" data-k="${k}"><span class="pair">${decoSVG(d)}${decoSVG(d, true)}</span><span>${esc(d.label)}</span></button>`).join("");
+  return `<div class="sheet-h"><div><div class="eyebrow">Shelf ${S.shelfTarget+1}</div><h2 style="margin-top:2px">${tab==="decor"?"Add decor":"Add bookends"}</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>
+  <div class="sheet-b"><div class="chips" style="margin-bottom:14px"><button class="chip" data-act="deco-open" data-tab="decor" aria-pressed="${tab==="decor"}">Decor</button><button class="chip" data-act="deco-open" data-tab="ends" aria-pressed="${tab==="ends"}">Bookends</button></div>
+  <p class="mini" style="margin:0 0 12px">${tab==="decor" ? "Tap an item to add it to the end of the shelf, then drag it where you like." : "Tap a style to add a pair: one at each end of the shelf. Flip or remove either one later."}</p>
+  <div class="deco-grid">${tiles}</div></div>`;
+}
+function layoutFromDOM(){
+  const rows = [...document.querySelectorAll('#bookcase .shelf[data-row]')].map(sh => [...sh.querySelectorAll(':scope > .slot[data-item]')].map(x => JSON.parse(x.dataset.item)));
+  const trayEl = document.querySelector('.shelf[data-row="tray"]');
+  const tray = trayEl ? [...trayEl.querySelectorAll(':scope > .slot[data-item]')].map(x => JSON.parse(x.dataset.item)).filter(it => it.t === "b").map(it => it.id) : [];
+  return {rows, tray};
+}
+function editLayout(fn){ const L = shelfLayout(S.year); fn(L); saveLayout(S.year, L); render(); }
 
 /* ---------- spine editor ---------- */
 function spineDraftFor(b){
@@ -740,13 +883,11 @@ function dashHTML(){
     <div class="tile"><span class="eyebrow">Avg length</span><span class="v num">${fin.length?Math.round(pages/fin.length):"—"} <small>pages</small></span></div>
   </section>`;
 
-  const ord = (S.settings.shelfOrder && S.settings.shelfOrder[y]) || [];
-  const pos = id => { const i = ord.indexOf(id); return i < 0 ? 1e6 : i; };
-  const shelfBooks = [...fin].sort((a,b) => pos(a.id) - pos(b.id) || (a.finishDate||"").localeCompare(b.finishDate||""));
-  const canArrange = S.canWrite && fin.length > 1;
-  const shelf = `<section class="panel"><div class="panel-h"><h2>The ${y} shelf</h2>${canArrange ? `<button class="btn ${S.arranging?"primary":"ghost"}" data-act="arrange">${S.arranging?"Done":"Rearrange"}</button>` : `<span class="eyebrow">${fin.length} finished · tap a spine</span>`}</div>
-    ${S.arranging ? `<p class="arrange-hint">Drag books to move them. On a keyboard, select a book and use the left and right arrow keys.</p>` : ""}
-    <div class="shelf${S.arranging?" arranging":""}" id="shelf">${fin.length ? shelfBooks.map(spine).join("") + PLANT : `<div class="shelf-empty">Finish a book in ${y} and its spine lands here.</div>`}</div></section>`;
+  const ed = S.shelfEdit, nRows = shelfLayout(y).rows.length;
+  const shelf = `<section class="panel"><div class="panel-h"><h2>The ${y} ${nRows > 1 ? "bookcase" : "shelf"}</h2>${S.canWrite ? `<button class="btn ${ed?"primary":"ghost"}" data-act="shelf-edit">${ed?"Done":"Edit shelves"}</button>` : `<span class="eyebrow">${fin.length} finished · tap a spine</span>`}</div>
+    ${ed ? shelfToolsHTML() : ""}
+    ${bookcaseHTML(y, fin)}
+    ${ed ? itemBarHTML(y) : ""}</section>`;
 
   const readingPanel = `<section class="panel"><div class="panel-h"><h2>On the nightstand</h2></div>
     ${reading.length ? `<div class="reading-list">${reading.map(b=>{
@@ -864,7 +1005,7 @@ function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
   if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
   scrim.hidden = false; document.body.style.overflow="hidden";
-  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : cmHTML(); return; }
+  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : cmHTML(); return; }
   if (S.openId==="import"){ sheet.innerHTML = importHTML(); return; }
   if (S.editing){ sheet.innerHTML = formHTML(); return; }
   const b = S.books.find(x=>x.id===S.openId);
@@ -982,7 +1123,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-f";
+const APP_VERSION = "2026.10.08-g";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1528,9 +1669,35 @@ async function shrink(file){
 document.addEventListener("click", async e => {
   const el = e.target.closest("[data-act]"); if(!el) return;
   const act = el.dataset.act;
-  if (act==="tab"){ S.arranging=false; S.tab=el.dataset.tab; render(); return; }
+  if (act==="tab"){ S.shelfEdit=false; S.shelfSel=null; S.tab=el.dataset.tab; render(); return; }
   if (act==="noop") return;
-  if (act==="arrange"){ S.arranging=!S.arranging; render(); if (!S.arranging) toast("Shelf saved"); return; }
+  if (act==="shelf-edit"){ S.shelfEdit=!S.shelfEdit; S.shelfSel=null; render(); if (!S.shelfEdit) toast("Shelves saved"); return; }
+  if (act==="shelf-add"){ editLayout(L => { L.rows.push([]); S.shelfTarget = L.rows.length - 1; }); return; }
+  if (act==="shelf-target"){ S.shelfTarget = Number(el.dataset.r); render(); return; }
+  if (act==="shelf-remove"){ const r = Number(el.dataset.r); editLayout(L => { const books = L.rows[r].filter(it => it.t === "b"); L.rows.splice(r, 1); const to = Math.max(0, r - 1); books.forEach(bk => pushInside(L.rows[to], bk)); S.shelfTarget = Math.min(S.shelfTarget, L.rows.length - 1); }); S.shelfSel=null; toast("Shelf removed"); return; }
+  if (act==="gap-add"){ editLayout(L => { pushInside(L.rows[S.shelfTarget], {t:"g", w:24, u:shelfUid()}); }); return; }
+  if (act==="deco-open"){ S.cm = {type:"deco", tab: el.dataset.tab}; renderModal(); return; }
+  if (act==="deco-add"){ const k = el.dataset.k; S.cm=null; renderModal(); editLayout(L => { pushInside(L.rows[S.shelfTarget], {t:"d", k, u:shelfUid()}); }); toast(`${DECOR[k].label} added`); return; }
+  if (act==="end-add"){ const k = el.dataset.k; S.cm=null; renderModal(); editLayout(L => { const row = L.rows[S.shelfTarget]; row.unshift({t:"e", k, f:false, u:shelfUid()}); row.push({t:"e", k, f:true, u:shelfUid()}); }); toast(`${BOOKENDS[k].label} bookends added`); return; }
+  if (act==="sel-clear"){ S.shelfSel=null; render(); return; }
+  if (act==="sel-puton"){ const id = S.shelfSel.slice(2); editLayout(L => { L.tray = L.tray.filter(x => x !== id); pushInside(L.rows[S.shelfTarget], {t:"b", id}); }); S.shelfSel=null; return; }
+  if (act==="sel-move"||act==="sel-off"||act==="sel-flip"||act==="sel-remove"||act==="sel-gap"){
+    const [r, i] = S.shelfSel.split(":").map(Number);
+    editLayout(L => {
+      const row = L.rows[r], it = row && row[i]; if (!it) return;
+      if (act==="sel-move"){
+        const d = Number(el.dataset.d), j = i + d;
+        if (j >= 0 && j < row.length){ row.splice(i, 1); row.splice(j, 0, it); S.shelfSel = `${r}:${j}`; }
+        else if (d < 0 && r > 0){ row.splice(i, 1); L.rows[r-1].push(it); S.shelfSel = `${r-1}:${L.rows[r-1].length-1}`; }
+        else if (d > 0 && r < L.rows.length - 1){ row.splice(i, 1); L.rows[r+1].unshift(it); S.shelfSel = `${r+1}:0`; }
+      }
+      if (act==="sel-off"){ row.splice(i, 1); L.tray.push(it.id); S.shelfSel = null; }
+      if (act==="sel-flip"){ it.f = !it.f; }
+      if (act==="sel-remove"){ row.splice(i, 1); S.shelfSel = null; }
+      if (act==="sel-gap"){ it.w = Math.max(8, Math.min(200, (Number(it.w)||24) + Number(el.dataset.d))); }
+    });
+    return;
+  }
   if (act==="spine-auto"){ await patch(S.openId, {spineManual:false, spineColor:"", spineText:"", spineFor:""}); toast("Spine matches the cover again"); return; }
   if (act==="signin"){ el.disabled=true; $("#signinMsg").textContent="Opening Google sign-in…"; window.NSAuth?.signIn(); return; }
   if (act==="signout"){ S.cm=null; renderModal(); window.NSAuth?.signOut(); return; }
@@ -1627,7 +1794,7 @@ document.addEventListener("submit", async e => {
 });
 
 document.addEventListener("change", async e => {
-  if (e.target.id==="yearSel"){ S.year=Number(e.target.value); S.editingGoal=false; S.arranging=false; render(); }
+  if (e.target.id==="yearSel"){ S.year=Number(e.target.value); S.editingGoal=false; S.shelfEdit=false; S.shelfSel=null; S.shelfTarget=null; render(); }
   if (e.target.id==="sp-font" && S.cm?.type==="spine"){ S.cm.d.font = e.target.value; refreshSpinePreview(); }
   if ((e.target.id==="sp-h-num" || e.target.id==="sp-w-num") && S.cm?.type==="spine"){
     // on leaving the box, pull out-of-range numbers back inside the allowed range
@@ -1687,36 +1854,37 @@ document.addEventListener("input", e => {
   if (e.target.id==="pickQ" && S.cm){ S.cm.q=e.target.value; $("#pickList").innerHTML = pickListHTML(); }
 });
 function dismiss(){ if (S.imp?.stage==="running") return; if (S.sum) S.sum.ctl?.abort?.(); S.sum=null; S.imp=null; S.cm=null; S.pendingSlot=null; S.openId=null; S.editing=false; renderModal(); }
-/* shelf rearranging: drag with mouse or finger, or arrow keys */
-function saveShelfOrder(){
-  const ids = [...document.querySelectorAll("#shelf .slot[data-id]")].map(x => x.dataset.id);
-  const shelfOrder = {...(S.settings.shelfOrder || {}), [S.year]: ids};
-  S.settings = {...S.settings, shelfOrder};
-  S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
-}
+/* bookcase editing: drag books, decor and bookends anywhere, across shelves and into the tray */
 document.addEventListener("pointerdown", e => {
-  if (!S.arranging) return;
-  const slot = e.target.closest("#shelf .slot[data-id]"); if (!slot) return;
-  e.preventDefault(); shelfDrag = {slot, moved:false}; slot.classList.add("dragging");
+  if (!S.shelfEdit) return;
+  const slot = e.target.closest(".shelf.editing .slot[data-item]"); if (!slot) return;
+  e.preventDefault(); shelfDrag = {slot, x:e.clientX, y:e.clientY, started:false};
 });
 document.addEventListener("pointermove", e => {
-  if (!shelfDrag) return; e.preventDefault();
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const over = el && el.closest("#shelf .slot[data-id]");
-  if (!over || over === shelfDrag.slot) return;
-  const r = over.getBoundingClientRect(); const after = e.clientX > r.left + r.width / 2;
-  over.parentNode.insertBefore(shelfDrag.slot, after ? over.nextSibling : over); shelfDrag.moved = true;
+  const d = shelfDrag; if (!d) return;
+  if (!d.started){ if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return; d.started = true; d.slot.classList.add("dragging"); }
+  e.preventDefault();
+  const el = document.elementFromPoint(e.clientX, e.clientY); if (!el) return;
+  const over = el.closest(".shelf.editing .slot[data-item]");
+  if (over && over !== d.slot){
+    const r = over.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+    over.parentNode.insertBefore(d.slot, after ? over.nextSibling : over);
+  } else if (!over){
+    const row = el.closest(".shelf.editing[data-row]");
+    if (row && row !== d.slot.parentNode){ row.querySelector(".shelf-drop")?.remove(); row.appendChild(d.slot); }
+  }
 }, {passive:false});
-const endDrag = () => { if (!shelfDrag) return; const d = shelfDrag; shelfDrag = null; d.slot.classList.remove("dragging"); if (d.moved) saveShelfOrder(); };
+const endDrag = () => {
+  const d = shelfDrag; if (!d) return; shelfDrag = null; d.slot.classList.remove("dragging");
+  if (d.started){ saveLayout(S.year, layoutFromDOM()); S.shelfSel = null; }
+  else S.shelfSel = d.slot.dataset.k;                     // a tap selects the item
+  render();
+};
 document.addEventListener("pointerup", endDrag); document.addEventListener("pointercancel", endDrag);
 document.addEventListener("keydown", e => {
-  if (!S.arranging || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-  const slot = e.target.closest && e.target.closest("#shelf .slot[data-id]"); if (!slot) return;
-  e.preventDefault();
-  const sib = e.key === "ArrowLeft" ? slot.previousElementSibling : slot.nextElementSibling;
-  if (!sib || !sib.dataset.id) return;
-  slot.parentNode.insertBefore(slot, e.key === "ArrowLeft" ? sib : sib.nextSibling);
-  slot.querySelector(".spine").focus(); saveShelfOrder();
+  if (!S.shelfEdit || !S.shelfSel || S.shelfSel.startsWith("t:") || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  if (e.target.closest && e.target.closest("input,select,textarea")) return;
+  e.preventDefault(); $(`[data-act="sel-move"][data-d="${e.key==="ArrowLeft"?-1:1}"]`)?.click();
 });
 document.addEventListener("keydown", e => {
   if (e.key==="Escape" && (S.openId||S.cm)) dismiss();
