@@ -117,6 +117,8 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .sc-ctl input[type=range]{flex:1 1 120px;min-width:0;accent-color:var(--accent)}
 .sc-ctl select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;min-width:0;max-width:100%}
 .sc-val{font-size:13px;min-width:44px;font-variant-numeric:tabular-nums}
+.sc-num{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
+.sc-num input{width:62px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .sc-tag{font-size:11.5px;font-weight:700;color:var(--accent);border:1px solid currentColor;border-radius:999px;padding:1px 8px}
 .sc-hint{font-size:12.5px;color:var(--muted);grid-column:2}
 .spine::before{top:6px}.spine::after{bottom:6px}
@@ -497,9 +499,9 @@ function spineEditHTML(){
       <div class="sc-row"><label for="sp-color">Spine color</label><div class="sc-ctl"><input type="color" id="sp-color" value="${esc(spineHexOf(mb))}">${d.colorManual?`<button type="button" class="linkish" data-act="sp-color-auto">Match cover</button>`:`<span class="sc-tag">Matches cover</span>`}</div></div>
       <div class="sc-row"><label for="sp-text">Text color</label><div class="sc-ctl"><input type="color" id="sp-text" value="${esc(d.textManual ? d.textColor : textOn(spineHexOf(mb)))}">${auto(d.textManual, "sp-text-auto")}</div></div>
       <div class="sc-row"><label for="sp-font">Font</label><div class="sc-ctl"><select id="sp-font">${Object.entries(SPINE_FONTS).map(([k,f])=>`<option value="${k}" ${k===d.font?"selected":""}>${f.label}</option>`).join("")}</select></div></div>
-      <div class="sc-row"><label for="sp-h">Height</label><div class="sc-ctl"><input type="range" id="sp-h" min="80" max="136" step="1" value="${L.ht}"><span class="sc-val" id="sp-h-val">${L.ht}px</span>${auto(!!d.height, "sp-h-auto")}</div></div>
-      <div class="sc-row"><label for="sp-w">Width</label><div class="sc-ctl"><input type="range" id="sp-w" min="12" max="80" step="1" value="${L.w}"><span class="sc-val" id="sp-w-val">${L.w}px</span>${auto(!!d.width, "sp-w-auto")}</div>
-        <div class="sc-hint">${d.width ? "Set by hand." : pages ? `Auto width follows the page count (${pages} pages).` : "Add a page count to the book and auto width will follow it."}</div></div>
+      <div class="sc-row"><label for="sp-h">Height</label><div class="sc-ctl"><input type="range" id="sp-h" min="80" max="136" step="1" value="${L.ht}" aria-label="Height slider"><span class="sc-num"><input type="number" id="sp-h-num" min="80" max="136" step="1" value="${L.ht}" inputmode="numeric" aria-label="Height in pixels">px</span>${auto(!!d.height, "sp-h-auto")}</div></div>
+      <div class="sc-row"><label for="sp-w">Width</label><div class="sc-ctl"><input type="range" id="sp-w" min="12" max="80" step="1" value="${L.w}" aria-label="Width slider"><span class="sc-num"><input type="number" id="sp-w-num" min="12" max="80" step="1" value="${L.w}" inputmode="numeric" aria-label="Width in pixels">px</span>${auto(!!d.width, "sp-w-auto")}</div>
+        <div class="sc-hint" id="sp-w-hint">${d.width ? "Set by hand." : pages ? `Auto width follows the page count (${pages} pages).` : "Add a page count to the book and auto width will follow it."}</div></div>
     </form>
   </div>
   <div class="foot"><button class="btn ghost" data-act="sp-reset">Reset to automatic</button><div class="grp"><button class="btn ghost" data-act="close-spine">Cancel</button><button class="btn primary" data-act="sp-save">Save spine</button></div></div></div>`;
@@ -509,9 +511,13 @@ function refreshSpinePreview(){
   const b = S.books.find(x => x.id === m.id); if (!b) return;
   const mb = spineMerged(b, m.d), L = spineLayout(mb);
   const pv = $("#spinePreview"); if (pv) pv.innerHTML = spine(mb);
-  const hv = $("#sp-h-val"), wv = $("#sp-w-val"), hr = $("#sp-h"), wr = $("#sp-w");
-  if (hv) hv.textContent = L.ht + "px"; if (wv) wv.textContent = L.w + "px";
-  if (hr && !m.d.height) hr.value = L.ht; if (wr && !m.d.width) wr.value = L.w;
+  const hint = $("#sp-w-hint"); if (hint && m.d.width) hint.textContent = "Set by hand.";
+  // keep slider and number box in step, without fighting whichever one is being typed in
+  [["sp-h", L.ht], ["sp-w", L.w]].forEach(([id, val]) => {
+    const r = $("#" + id), n = $("#" + id + "-num");
+    if (r && document.activeElement !== r) r.value = val;
+    if (n && document.activeElement !== n) n.value = val;
+  });
   const tc = $("#sp-text"); if (tc && !m.d.textManual) tc.value = textOn(spineHexOf(mb));
 }
 async function saveSpine(){
@@ -976,7 +982,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-e";
+const APP_VERSION = "2026.10.08-f";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1623,6 +1629,14 @@ document.addEventListener("submit", async e => {
 document.addEventListener("change", async e => {
   if (e.target.id==="yearSel"){ S.year=Number(e.target.value); S.editingGoal=false; S.arranging=false; render(); }
   if (e.target.id==="sp-font" && S.cm?.type==="spine"){ S.cm.d.font = e.target.value; refreshSpinePreview(); }
+  if ((e.target.id==="sp-h-num" || e.target.id==="sp-w-num") && S.cm?.type==="spine"){
+    // on leaving the box, pull out-of-range numbers back inside the allowed range
+    const el = e.target, lo = Number(el.min), hi = Number(el.max); let n = Math.round(Number(el.value));
+    if (isNaN(n) || !el.value) { refreshSpinePreview(); return; }
+    n = Math.max(lo, Math.min(hi, n)); el.value = n;
+    if (el.id==="sp-h-num") S.cm.d.height = n; else S.cm.d.width = n;
+    const r = $("#" + el.id.replace("-num","")); if (r) r.value = n; refreshSpinePreview();
+  }
   if (e.target.id==="spineColorIn" && S.openId){ const v=e.target.value; await patch(S.openId, {spineColor:v, spineText:textOn(v), spineManual:true}); toast("Spine color saved"); }
   if (e.target.id==="fGenre"){ S.fGenre=e.target.value; renderGrid(); }
   if (e.target.id==="sort"){ S.sort=e.target.value; renderGrid(); }
@@ -1657,9 +1671,15 @@ document.addEventListener("input", e => {
     if (id==="sp-font"){ d.font = v; }
     if (id==="sp-h"){ d.height = Number(v); }
     if (id==="sp-w"){ d.width = Number(v); }
+    if (id==="sp-h-num" || id==="sp-w-num"){
+      const n = Number(v), lo = Number(e.target.min), hi = Number(e.target.max);
+      if (!v || isNaN(n) || n < lo || n > hi) return;           // wait until the number is in range
+      if (id==="sp-h-num") d.height = n; else d.width = n;
+      const r = $("#" + id.replace("-num","")); if (r) r.value = n;
+    }
     refreshSpinePreview();
     // show that the control is now set by hand
-    const tag = e.target.parentNode.querySelector(".sc-tag"); if (tag && id!=="sp-font"){ const btn=document.createElement("button"); btn.type="button"; btn.className="linkish"; btn.textContent = id==="sp-color" ? "Match cover" : "Auto"; btn.dataset.act = {"sp-color":"sp-color-auto","sp-text":"sp-text-auto","sp-h":"sp-h-auto","sp-w":"sp-w-auto"}[id]; tag.replaceWith(btn); }
+    const tag = e.target.closest(".sc-ctl").querySelector(".sc-tag"); if (tag && id!=="sp-font"){ const btn=document.createElement("button"); btn.type="button"; btn.className="linkish"; btn.textContent = id==="sp-color" ? "Match cover" : "Auto"; btn.dataset.act = {"sp-color":"sp-color-auto","sp-text":"sp-text-auto","sp-h":"sp-h-auto","sp-w":"sp-w-auto","sp-h-num":"sp-h-auto","sp-w-num":"sp-w-auto"}[id]; tag.replaceWith(btn); }
     return;
   }
   if (e.target.id==="olq" && S.ol){ S.ol.q=e.target.value; S.ol.picked=false; clearTimeout(S.ol.t); S.ol.t=setTimeout(runOlSearch, 450); }
