@@ -211,6 +211,9 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .legend b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
 .upnext{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
 .upnext .cover-btn{flex:0 0 74px}
+.quick-row{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center}
+.upnext-check{margin:0;align-items:center}
+.upnext-check input{width:18px;height:18px;margin:0}
 .un-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .upnext.reordering{flex-wrap:wrap;overflow:visible}
 .un-item{flex:0 0 74px;display:flex;flex-direction:column;gap:4px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
@@ -818,11 +821,12 @@ function appearanceHTML(){
 applyLook();
 
 /* ---------- up next order ---------- */
+// Up next holds only the want-to-read books you've checked, in the order you set
 function upNextList(){
-  const ord = S.settings.upNext || [];
-  const pos = id => { const i = ord.indexOf(id); return i < 0 ? 1e6 : i; };
-  return S.books.filter(b => b.status === "tbr").sort((a, b) => pos(a.id) - pos(b.id) || (a.dateAdded||"").localeCompare(b.dateAdded||"") || (a.createdAt||0) - (b.createdAt||0));
+  const seen = new Set();
+  return (S.settings.upNext || []).filter(id => !seen.has(id) && seen.add(id)).map(id => S.books.find(b => b.id === id)).filter(b => b && b.status === "tbr");
 }
+const inUpNext = id => (S.settings.upNext || []).includes(id);
 function saveUpNext(ids){
   S.settings = {...S.settings, upNext: ids};
   S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
@@ -842,7 +846,7 @@ document.addEventListener("pointermove", e => {
 }, {passive:false});
 const endUnDrag = () => {
   const d = unDrag; if (!d) return; unDrag = null; d.it.classList.remove("dragging");
-  if (d.started){ saveUpNext([...document.querySelectorAll("#upnext .un-item")].map(x => x.dataset.id)); render(); }
+  if (d.started){ const shown = [...document.querySelectorAll("#upnext .un-item")].map(x => x.dataset.id); saveUpNext([...shown, ...(S.settings.upNext || []).filter(id => !shown.includes(id))]); render(); }
 };
 document.addEventListener("pointerup", endUnDrag); document.addEventListener("pointercancel", endUnDrag);
 
@@ -968,7 +972,7 @@ function dashHTML(){
   const rated = fin.filter(b=>Number(b.rating)>0);
   const avg = rated.length ? rated.reduce((s,b)=>s+Number(b.rating),0)/rated.length : 0;
   const reading = S.books.filter(b=>b.status==="reading");
-  const tbr = upNextList();
+  const tbr = S.books.filter(b => b.status === "tbr"), un = upNextList();
   const spent = S.books.filter(b=>yr(b.dateAdded)===y).reduce((s,b)=>s+(Number(b.cost)||0),0);
   const both = rated.filter(b=>Number(b.communityRating)>0);
   let commLine = "";
@@ -1034,12 +1038,12 @@ function dashHTML(){
       const p=Number(b.pages)||0, c=Math.min(p||Infinity, Number(b.currentPage)||0), pc = p?Math.round(c/p*100):0;
       return `<button class="reading-item" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div>${formatChip(b.format)}<div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${p?`Page ${c} of ${p} · ${pc}%`:"Add a page count to track progress"}</div></div></button>`;}).join("")}</div>`
       : `<p class="empty">Nothing in progress. Open a book from your library and mark it as reading.</p>`}
-    ${tbr.length ? `<div class="block"><div class="un-head"><span class="eyebrow">Up next</span>${S.canWrite && tbr.length > 1 ? `<button class="linkish" data-act="un-reorder">${S.unReorder ? "Done" : "Reorder"}</button>` : ""}</div>
+    ${un.length ? `<div class="block"><div class="un-head"><span class="eyebrow">Up next</span>${S.canWrite && un.length > 1 ? `<button class="linkish" data-act="un-reorder">${S.unReorder ? "Done" : "Reorder"}</button>` : ""}</div>
       ${S.unReorder ? `<p class="mini" style="margin:0 0 8px">Drag covers into the order you plan to read them, or use the arrows.</p>` : ""}
-      <div class="upnext${S.unReorder ? " reordering" : ""}" id="upnext">${(S.unReorder ? tbr : tbr.slice(0,8)).map((b, i, arr) => S.unReorder
+      <div class="upnext${S.unReorder ? " reordering" : ""}" id="upnext">${(S.unReorder ? un : un.slice(0,8)).map((b, i, arr) => S.unReorder
         ? `<div class="un-item" data-id="${esc(b.id)}">${cover(b,"sm")}<span class="un-arrows"><button class="un-arrow" data-act="un-move" data-id="${esc(b.id)}" data-d="-1" aria-label="Move ${esc(b.title)} earlier" ${i===0?"disabled":""}>◀</button><button class="un-arrow" data-act="un-move" data-id="${esc(b.id)}" data-d="1" aria-label="Move ${esc(b.title)} later" ${i===arr.length-1?"disabled":""}>▶</button></span></div>`
         : `<button class="cover-btn" data-act="open" data-id="${esc(b.id)}" title="${esc(b.title)}">${cover(b,"sm")}</button>`).join("")}</div>
-      ${!S.unReorder && tbr.length > 8 ? `<p class="mini" style="margin:6px 0 0">+ ${tbr.length - 8} more on your want-to-read list</p>` : ""}</div>`:""}
+      ${!S.unReorder && un.length > 8 ? `<p class="mini" style="margin:6px 0 0">+ ${un.length - 8} more in Up next</p>` : ""}</div>`: tbr.length && S.canWrite ? `<div class="block"><div class="eyebrow" style="margin-bottom:6px">Up next</div><p class="mini" style="margin:0">Open a want-to-read book and check <b>Up next</b> to line it up here.</p></div>` : ""}
   </section>`;
 
   // monthly chart
@@ -1165,7 +1169,8 @@ function renderModal(){
   const prog = b.status==="reading" ? `<div class="block"><div class="eyebrow">Progress</div><div class="bar" style="height:8px"><i style="width:${pc}%"></i></div>
       <div class="prog-row">${S.canWrite?`<label for="curPage" class="mini">I'm on page</label><input id="curPage" type="number" min="0" ${p?`max="${p}"`:""} value="${c||""}"><button class="btn" data-act="save-page">Update</button><button class="btn primary" data-act="finish">Mark finished</button>`:`<span class="mini num">Page ${c} of ${p||"?"}</span>`}</div>
       ${p?`<div class="mini num">${pc}% · ${Math.max(0,p-c)} pages left</div>`:""}</div>` : "";
-  const quick = S.canWrite && b.status==="tbr" ? `<div class="block"><button class="btn primary" data-act="start">Start reading today</button></div>` : "";
+  const quick = S.canWrite && b.status==="tbr" ? `<div class="block quick-row"><button class="btn primary" data-act="start">Start reading today</button>
+      <label class="check upnext-check"><input type="checkbox" id="unToggle" ${inUpNext(b.id)?"checked":""}> <span><b>Up next</b><span class="mini" style="display:block">Show it in Up next on the dashboard</span></span></label></div>` : "";
   sheet.innerHTML = `<div class="sheet-h"><span class="status s-${esc(b.status)}">${esc(STATUS[b.status])}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="detail">
     <div class="dcover">${cover(b)}${S.canWrite?`<button class="btn ghost switch-cover" data-act="covers">Switch cover</button>
@@ -1273,7 +1278,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-i";
+const APP_VERSION = "2026.10.08-j";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1825,7 +1830,7 @@ document.addEventListener("click", async e => {
   if (act==="noop") return;
   if (act==="un-reorder"){ S.unReorder = !S.unReorder; render(); if (!S.unReorder) toast("Up next order saved"); return; }
   if (act==="un-move"){ const ids = upNextList().map(b => b.id); const i = ids.indexOf(el.dataset.id), j = i + Number(el.dataset.d);
-    if (i >= 0 && j >= 0 && j < ids.length){ ids.splice(i, 1); ids.splice(j, 0, el.dataset.id); saveUpNext(ids); render(); } return; }
+    if (i >= 0 && j >= 0 && j < ids.length){ ids.splice(i, 1); ids.splice(j, 0, el.dataset.id); saveUpNext([...ids, ...(S.settings.upNext || []).filter(id => !ids.includes(id))]); render(); } return; }
   if (act==="dash-custom"){ S.openId=null; S.cm={type:"dash"}; renderModal(); return; }
   if (act==="dash-showall"){ saveDashHidden([]); renderModal(); return; }
   if (act==="look-theme"){ saveLook({theme: el.dataset.k}); return; }
@@ -1918,7 +1923,7 @@ document.addEventListener("click", async e => {
   }
   if (act==="save-page"){ const v=Number($("#curPage").value)||0; await patch(S.openId,{currentPage:v}); toast("Progress saved"); return; }
   if (act==="finish"){ const b=S.books.find(x=>x.id===S.openId); await patch(S.openId,{status:"finished",finishDate:today(),currentPage:b.pages||b.currentPage||""}); toast("Finished! It's on your shelf."); return; }
-  if (act==="start"){ await patch(S.openId,{status:"reading",startDate:today()}); toast("Happy reading"); return; }
+  if (act==="start"){ const sid = S.openId; if (inUpNext(sid)) saveUpNext((S.settings.upNext || []).filter(x => x !== sid)); await patch(sid,{status:"reading",startDate:today()}); toast("Happy reading"); return; }
   if (act==="disarm"){ S.armedDelete=false; renderModal(); return; }
   if (act==="delete"){
     if(!S.armedDelete){ S.armedDelete=true; renderModal(); return; }
@@ -1959,6 +1964,11 @@ document.addEventListener("change", async e => {
     const hidden = new Set(S.settings.dashHidden || []); const k = e.target.dataset.dash;
     if (e.target.checked) hidden.delete(k); else hidden.add(k);
     saveDashHidden([...hidden]);
+  }
+  if (e.target.id==="unToggle" && S.openId){
+    const id = S.openId, ids = (S.settings.upNext || []).filter(x => x !== id);
+    if (e.target.checked) ids.push(id);
+    saveUpNext(ids); render(); toast(e.target.checked ? "Added to Up next" : "Removed from Up next");
   }
   if (e.target.id==="sp-font" && S.cm?.type==="spine"){ S.cm.d.font = e.target.value; refreshSpinePreview(); }
   if ((e.target.id==="sp-h-num" || e.target.id==="sp-w-num") && S.cm?.type==="spine"){
