@@ -911,7 +911,8 @@ function saveDashHidden(list){
 }
 
 /* ---------- genres & statuses ---------- */
-const genreList = () => Array.isArray(S.settings.genres) ? S.settings.genres : GENRES;
+const byName = (a, b) => String(a).localeCompare(String(b), undefined, {sensitivity:"base", numeric:true});
+const genreList = () => [...(Array.isArray(S.settings.genres) ? S.settings.genres : GENRES)].sort(byName);
 function saveSettings(part){ S.settings = {...S.settings, ...part}; S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err))); }
 function rememberGenre(g){ g = String(g||"").trim(); if (!g) return; const list = genreList(); if (list.some(x => x.toLowerCase() === g.toLowerCase())) return; saveSettings({genres: [...list, g]}); }
 const BUILTIN_ST = ["reading","tbr","finished","dnf"];
@@ -928,8 +929,8 @@ function catsHTML(){
   return `<div class="sheet-h"><h2>Genres &amp; statuses</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b">
     <div class="eyebrow">Genres</div>
-    <p class="mini" style="margin:4px 0 10px">These fill the genre menu on every book. Renaming one also renames it on the books that use it. Removing one takes it out of the menu, but books already in it keep it.</p>
-    <div class="cat-list">${gl.map((g,i) => `<div class="cat-row"><input class="cat-name" data-genre-i="${i}" value="${esc(g)}" aria-label="Genre name"><span class="mini num">${nb(counts[g])}</span><button class="btn ghost sm" data-act="genre-up" data-i="${i}" ${i?"":"disabled"} aria-label="Move ${esc(g)} up">↑</button><button class="btn ghost sm" data-act="genre-del" data-i="${i}">Remove</button></div>`).join("")}</div>
+    <p class="mini" style="margin:4px 0 10px">These fill the genre menu on every book, in A–Z order. Renaming one also renames it on the books that use it. Removing one takes it out of the menu, but books already in it keep it.</p>
+    <div class="cat-list">${gl.map((g,i) => `<div class="cat-row"><input class="cat-name" data-genre-i="${i}" value="${esc(g)}" aria-label="Genre name"><span class="mini num">${nb(counts[g])}</span><button class="btn ghost sm" data-act="genre-del" data-i="${i}">Remove</button></div>`).join("")}</div>
     <form id="genreAdd" class="cat-add"><input id="newGenre" placeholder="Add a genre" aria-label="New genre"><button class="btn" type="submit">Add</button></form>
     ${unlisted.length ? `<p class="mini" style="margin:12px 0 6px">On your books but not in the menu:</p><div class="chips">${unlisted.map(g => `<button class="chip" data-act="genre-add-un" data-g="${esc(g)}">+ ${esc(g)} <span class="num">(${counts[g]})</span></button>`).join("")}</div>` : ""}
     <div style="margin-top:10px"><button class="linkish" data-act="genre-defaults">Add back any missing starter genres</button></div>
@@ -1438,7 +1439,7 @@ function formHTML(){
         </div></div>
       <div class="f full"><label for="f-title">Title</label><input id="f-title" name="title" required value="${esc(d.title)}"></div>
       <div class="f"><label for="f-author">Author</label><input id="f-author" name="author" value="${esc(d.author)}"></div>
-      <div class="f"><label for="f-genre">Genre</label><select id="f-genre" name="genre"><option value="">—</option>${[...genreList(), ...(d.genre && !genreList().includes(d.genre) ? [d.genre] : [])].map(g=>`<option value="${esc(g)}" ${g===d.genre?"selected":""}>${esc(g)}</option>`).join("")}<option value="__other">Something else…</option></select><input id="f-genreOther" name="genreOther" placeholder="Type a genre" aria-label="Your own genre" hidden style="margin-top:6px"></div>
+      <div class="f"><label for="f-genre">Genre</label><select id="f-genre" name="genre"><option value="">—</option>${[...genreList(), ...(d.genre && !genreList().includes(d.genre) ? [d.genre] : [])].sort(byName).map(g=>`<option value="${esc(g)}" ${g===d.genre?"selected":""}>${esc(g)}</option>`).join("")}<option value="__other">Something else…</option></select><input id="f-genreOther" name="genreOther" placeholder="Type a genre" aria-label="Your own genre" hidden style="margin-top:6px"></div>
       <div class="f"><label for="f-status">Status</label><select id="f-status" name="status">${allStatuses().map(([k,l])=>`<option value="${k}" ${k===d.status?"selected":""}>${l}</option>`).join("")}</select></div>
       <div class="f"><label for="f-rating">Rating</label><select id="f-rating" name="rating">${ratingOpts}</select></div>
       <div class="f"><label for="f-format">Format</label><select id="f-format" name="format">${opt(FORMATS,d.format)}</select></div>
@@ -1494,7 +1495,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-t";
+const APP_VERSION = "2026.10.08-u";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
