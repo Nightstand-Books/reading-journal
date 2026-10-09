@@ -16,6 +16,12 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.29.0 (October 8, 2026)
+- The Source menu is in A–Z order, and sources you add slot into place alphabetically.
+- When a book's source is **Bought**, a **Store** menu appears: Amazon, Barnes & Noble, Books-A-Million, Bookshop.org, Costco, Target, Walmart, Indie bookstore, Used bookstore, or **Somewhere else…** to type your own. Stores you type in are remembered.
+- A book's details show the store next to the source, like "Bought · Amazon."
+- The account menu editor is now **Genres, statuses, sources & stores**, with a Stores section for adding or removing stores.
+
 ## 1.28.3 (October 8, 2026)
 - The owned setting is a checkbox again, now labeled simply **Owned**, with "On your shelf at home" or "Not in your collection" underneath.
 - TBR shelf buttons on a book's page show a checkmark when the book is on that shelf and a + when it isn't, so they no longer look like the Owned checkbox.
