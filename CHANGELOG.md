@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.21.0 (October 8, 2026)
+- The spine editor shows the book's cover. Tap **Pick spine color** or **Pick text color**, then tap anywhere on the cover to use that color.
+- With the cover on screen, the eyedropper in the color boxes can sample it too.
+
 ## 1.20.1 (October 8, 2026)
 - Switched to 1.0.0-style version numbers and renumbered every past release.
 - Added this changelog, with a **what's new** link next to the version number in the account menu.

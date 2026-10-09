@@ -113,6 +113,11 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 @media (max-width:600px){.spine-edit{grid-template-columns:1fr}}
 .shelf.preview{justify-content:center;min-height:152px;padding:0 14px}
 .spine-stage p{text-align:center;margin:8px 0 0}
+.sp-cover{margin:14px auto 0;width:140px;border-radius:4px 8px 8px 4px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.18),0 8px 18px -10px rgba(0,0,0,.5)}
+.sp-cover img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.sp-cover.picking{cursor:crosshair;outline:2px solid var(--accent);outline-offset:3px}
+.sp-pick{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.sp-pick .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .spine-controls{display:flex;flex-direction:column;gap:14px}
 .sc-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center}
 .sc-row>label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
@@ -724,7 +729,10 @@ function spineEditHTML(){
   const auto = (on, act) => `<span class="sc-auto">${on ? `<button type="button" class="linkish" data-act="${act}">Auto</button>` : `<span class="sc-tag">Auto</span>`}</span>`;
   return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">Edit spine</div><h2 style="margin-top:2px">${esc(b.title)}</h2></div><button class="x" data-act="close-spine" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="spine-edit">
-    <div class="spine-stage"><div class="shelf preview" id="spinePreview">${spine(mb)}</div><p class="mini">Preview at shelf size</p></div>
+    <div class="spine-stage"><div class="shelf preview" id="spinePreview">${spine(mb)}</div><p class="mini">Preview at shelf size</p>
+      ${coverSrcOf(b) ? `<div class="sp-cover${m.pick ? " picking" : ""}"><img id="spCover" src="${esc(coverSrcOf(b))}" alt="Cover of ${esc(b.title)}" draggable="false"></div>
+      <div class="sp-pick"><button type="button" class="btn ghost sm" data-act="sp-pick" data-k="color" aria-pressed="${m.pick==="color"}">Pick spine color</button><button type="button" class="btn ghost sm" data-act="sp-pick" data-k="text" aria-pressed="${m.pick==="text"}">Pick text color</button></div>
+      <p class="mini" id="spPickHint">${m.pick ? `Tap anywhere on the cover to use that color for the ${m.pick==="color" ? "spine" : "text"}.` : "Choose what to color, then tap the cover. The color boxes' eyedropper can also sample it."}</p>` : ""}</div>
     <form id="spineForm" class="spine-controls" autocomplete="off">
       <div class="sc-row"><label for="sp-color">Spine color</label><div class="sc-ctl"><input type="color" id="sp-color" value="${esc(spineHexOf(mb))}">${d.colorManual?`<button type="button" class="linkish" data-act="sp-color-auto">Match cover</button>`:`<span class="sc-tag">Matches cover</span>`}</div></div>
       <div class="sc-row"><label for="sp-text">Text color</label><div class="sc-ctl"><input type="color" id="sp-text" value="${esc(d.textManual ? d.textColor : textOn(spineHexOf(mb)))}">${auto(d.textManual, "sp-text-auto")}</div></div>
@@ -1593,7 +1601,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.20.1";
+const APP_VERSION = "1.21.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2152,6 +2160,27 @@ async function shrink(file){
 }
 
 /* ---------- events ---------- */
+async function sampleCover(e){
+  const m = S.cm, img = e.target; if (!m || m.type !== "spine" || !m.pick) return;
+  const b = S.books.find(x => x.id === m.id); if (!b) return;
+  try {
+    if (!m.corsImg) m.corsImg = await loadCors(coverSrcOf(b));
+    const ci = m.corsImg, r = img.getBoundingClientRect();
+    const px = Math.round((e.clientX - r.left) / r.width * ci.naturalWidth), py = Math.round((e.clientY - r.top) / r.height * ci.naturalHeight);
+    const c = document.createElement("canvas"); c.width = 5; c.height = 5;
+    const x = c.getContext("2d", {willReadFrequently:true}); x.drawImage(ci, px - 2, py - 2, 5, 5, 0, 0, 5, 5);
+    const d = x.getImageData(0, 0, 5, 5).data; let rr=0, gg=0, bb=0, n=0;
+    for (let i = 0; i < d.length; i += 4){ if (d[i+3] < 128) continue; rr += d[i]; gg += d[i+1]; bb += d[i+2]; n++; }
+    if (!n) return;
+    const hex = "#" + [rr, gg, bb].map(v => Math.round(v / n).toString(16).padStart(2, "0")).join("");
+    const inp = $(m.pick === "color" ? "#sp-color" : "#sp-text"); if (!inp) return;
+    inp.value = hex; inp.dispatchEvent(new Event("input", {bubbles:true}));
+    toast(`${m.pick === "color" ? "Spine" : "Text"} color set to ${hex}`);
+  } catch(_) {
+    toast("This cover's image host doesn't allow picking colors from it. Use the color box's eyedropper instead.");
+  }
+}
+document.addEventListener("click", e => { if (e.target.id === "spCover") sampleCover(e); });
 document.addEventListener("click", async e => {
   if (nsSuppressClick && e.target.closest(".reading-item")){ nsSuppressClick = false; e.preventDefault(); return; }
   const el = e.target.closest("[data-act]"); if(!el) return;
@@ -2168,6 +2197,9 @@ document.addEventListener("click", async e => {
   if (act==="tbr-quick"){ const name = el.dataset.name; if (!tbrShelves().some(x => x.name.toLowerCase()===name.toLowerCase())) saveTbr([...tbrShelves(), {id:"t"+Date.now().toString(36), name, note:"", books:[], createdAt:Date.now()}]); toast(`${name} shelf added`); render(); return; }
   if (act==="close-tbr"){ const back = S.cm?.forBook; S.cm=null; S.openId = back || null; render(); return; }
   if (act==="tbr-del"){ const m=S.cm; if (!m.armed){ m.armed=true; renderModal(); return; } const x = tbrShelves().find(z => z.id===m.id); saveTbr(tbrShelves().filter(z => z.id!==m.id)); S.cm=null; toast(`Deleted ${x ? x.name : "shelf"}`); render(); return; }
+  if (act==="sp-pick"){ const m=S.cm; if (!m || m.type!=="spine") return; m.pick = m.pick===el.dataset.k ? null : el.dataset.k;
+    $(".sp-cover")?.classList.toggle("picking", !!m.pick); document.querySelectorAll('[data-act="sp-pick"]').forEach(x => x.setAttribute("aria-pressed", String(x.dataset.k===m.pick)));
+    const h=$("#spPickHint"); if (h) h.textContent = m.pick ? `Tap anywhere on the cover to use that color for the ${m.pick==="color" ? "spine" : "text"}.` : "Choose what to color, then tap the cover. The color boxes' eyedropper can also sample it."; return; }
   if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
   if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
   if (act==="genre-del"){ const gl = [...genreList()]; gl.splice(Number(el.dataset.i), 1); saveSettings({genres: gl}); renderModal(); return; }
