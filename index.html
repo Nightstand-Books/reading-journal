@@ -251,7 +251,41 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .stars{color:var(--brass);letter-spacing:1px;font-size:13px;white-space:nowrap}
 .status{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
-.s-reading{color:var(--brass)} .s-finished{color:var(--accent)} .s-tbr{color:var(--muted)} .s-dnf{color:var(--rust)}
+.s-reading{color:var(--brass)} .s-finished{color:var(--accent)} .s-tbr{color:var(--muted)} .s-dnf{color:var(--rust)} .s-custom{color:var(--ink)}
+.cat-list{display:flex;flex-direction:column;gap:6px}
+.tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{white-space:nowrap}
+.tbr-shelf{margin-bottom:16px}
+.t-short{display:none}
+@media (max-width:520px){.tab{padding:10px 9px}.t-long{display:none}.t-short{display:inline}.tbr-shelf .chal-h{flex-direction:column}}
+.tbr-shelf .grp{display:flex;gap:8px;flex-wrap:wrap}
+.tbr-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:16px 14px;margin-top:14px}
+.tbr-item{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tbr-item.done .cover{opacity:.55}
+.tbr-done{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:99px;white-space:nowrap;pointer-events:none}
+.tbr-done.reading{background:var(--brass)}
+.tbr-t{font-size:12.5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tbr-ideas{justify-content:center;margin-top:8px}
+.tbr-more{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}.tbr-more .chips{justify-content:flex-start;margin:0}
+.tbr-pick-list{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto}
+.tbr-pick{display:flex;align-items:center;gap:12px;padding:6px 8px;border-radius:10px;cursor:pointer}
+.tbr-pick:hover{background:var(--sunk)}
+.tbr-pick input{width:18px;height:18px;flex:0 0 auto;margin:0}
+.tbr-pick .cover{width:34px;flex:0 0 34px}
+.tbr-pick>span{display:flex;flex-direction:column}
+.tbr-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tbr-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:5px 12px;font-size:13.5px;cursor:pointer;background:var(--surface)}
+.tbr-chip:has(input:checked){border-color:var(--accent);color:var(--accent);font-weight:700}
+.tbr-chip input{margin:0;accent-color:var(--accent)}
+.cat-row{display:flex;align-items:center;gap:8px}
+.cat-row .cat-name{flex:1;min-width:0}
+.cat-row .mini{white-space:nowrap}
+.cat-add{display:flex;gap:8px;margin-top:10px}.cat-add input{flex:1;min-width:0}
+.btn.sm{padding:4px 10px;font-size:13px;min-height:0}
+.aed-list{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow-y:auto}
+.aed-opt{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card, transparent);color:inherit;font:inherit;cursor:pointer}
+.aed-opt[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.aed-opt>span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.aed-opt .num{white-space:nowrap}
 .lib-count{color:var(--muted);font-size:13.5px;margin-bottom:12px}
 .lib-empty{padding:50px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
 
@@ -439,6 +473,7 @@ img{max-width:100%}
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" id="tab-dash" data-act="tab" data-tab="dash" aria-selected="true">Dashboard</button>
     <button class="tab" role="tab" id="tab-lib" data-act="tab" data-tab="lib" aria-selected="false">Library</button>
+    <button class="tab" role="tab" id="tab-tbr" data-act="tab" data-tab="tbr" aria-selected="false"><span class="t-long">TBR Shelves</span><span class="t-short">TBR</span></button>
     <button class="tab" role="tab" id="tab-chal" data-act="tab" data-tab="chal" aria-selected="false">Challenges</button>
   </nav>
   <div id="notice"></div>
@@ -454,7 +489,7 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const STATUS = {reading:"Reading", tbr:"Want to read", finished:"Finished", dnf:"Did not finish"};
 const FORMATS = ["Print","Ebook","Audiobook"];
 const SOURCES = ["Bought","Library","Gift","Borrowed","Kindle Unlimited","Other"];
-const GENRES = ["Literary fiction","Historical fiction","Romance","Fantasy","Science fiction","Mystery / thriller","Contemporary","Memoir","Nonfiction","Education","Children's / YA","Poetry"];
+const GENRES = ["Literary fiction","Historical fiction","Romance","Romantasy","Fantasy","Science fiction","Mystery / thriller","Contemporary","Memoir","Nonfiction","Education","Young adult","Middle grade","Children's","Poetry"];
 const HUES = [150,95,40,15,355,320,265,220,195,28];
 const today = () => new Date().toLocaleDateString("en-CA");
 const thisYear = new Date().getFullYear();
@@ -871,6 +906,142 @@ function saveDashHidden(list){
   render();
 }
 
+/* ---------- genres & statuses ---------- */
+const genreList = () => Array.isArray(S.settings.genres) ? S.settings.genres : GENRES;
+function saveSettings(part){ S.settings = {...S.settings, ...part}; S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err))); }
+function rememberGenre(g){ g = String(g||"").trim(); if (!g) return; const list = genreList(); if (list.some(x => x.toLowerCase() === g.toLowerCase())) return; saveSettings({genres: [...list, g]}); }
+const BUILTIN_ST = ["reading","tbr","finished","dnf"];
+const customStatuses = () => Array.isArray(S.settings.statuses) ? S.settings.statuses : [];
+const stLabel = k => ((S.settings && S.settings.statusNames) || {})[k] || STATUS[k] || (customStatuses().find(x => x.id === k) || {}).name || "";
+const allStatuses = () => [...BUILTIN_ST.map(k => [k, stLabel(k)]), ...customStatuses().map(x => [x.id, x.name])];
+const stClass = k => BUILTIN_ST.includes(k) ? "s-" + k : "s-custom";
+function catsHTML(){
+  const gl = genreList(), counts = {}, sc = {};
+  S.books.forEach(b => { if (b.genre) counts[b.genre] = (counts[b.genre]||0) + 1; sc[b.status] = (sc[b.status]||0) + 1; });
+  const nb = n => `${n||0} book${n===1?"":"s"}`;
+  const unlisted = Object.keys(counts).filter(g => !gl.includes(g)).sort();
+  const names = S.settings.statusNames || {};
+  return `<div class="sheet-h"><h2>Genres &amp; statuses</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+  <div class="sheet-b">
+    <div class="eyebrow">Genres</div>
+    <p class="mini" style="margin:4px 0 10px">These fill the genre menu on every book. Renaming one also renames it on the books that use it. Removing one takes it out of the menu, but books already in it keep it.</p>
+    <div class="cat-list">${gl.map((g,i) => `<div class="cat-row"><input class="cat-name" data-genre-i="${i}" value="${esc(g)}" aria-label="Genre name"><span class="mini num">${nb(counts[g])}</span><button class="btn ghost sm" data-act="genre-up" data-i="${i}" ${i?"":"disabled"} aria-label="Move ${esc(g)} up">↑</button><button class="btn ghost sm" data-act="genre-del" data-i="${i}">Remove</button></div>`).join("")}</div>
+    <form id="genreAdd" class="cat-add"><input id="newGenre" placeholder="Add a genre" aria-label="New genre"><button class="btn" type="submit">Add</button></form>
+    ${unlisted.length ? `<p class="mini" style="margin:12px 0 6px">On your books but not in the menu:</p><div class="chips">${unlisted.map(g => `<button class="chip" data-act="genre-add-un" data-g="${esc(g)}">+ ${esc(g)} <span class="num">(${counts[g]})</span></button>`).join("")}</div>` : ""}
+    <div style="margin-top:10px"><button class="linkish" data-act="genre-defaults">Add back any missing starter genres</button></div>
+    <div class="eyebrow" style="margin-top:26px">Statuses</div>
+    <p class="mini" style="margin:4px 0 10px">The first four run your stats (reading now, finished, and so on), so you can rename them but not remove them. Statuses you add work like extra shelves in your library.</p>
+    <div class="cat-list">${BUILTIN_ST.map(k => `<div class="cat-row"><input class="cat-name" data-st="${k}" value="${esc(stLabel(k))}" placeholder="${esc(STATUS[k])}" aria-label="Name for ${esc(STATUS[k])}"><span class="mini num">${nb(sc[k])}</span><span class="status ${stClass(k)}">built in</span></div>`).join("")}
+    ${customStatuses().map((x,i) => `<div class="cat-row"><input class="cat-name" data-cst-i="${i}" value="${esc(x.name)}" aria-label="Status name"><span class="mini num">${nb(sc[x.id])}</span><button class="btn ghost sm" data-act="st-del" data-i="${i}">${sc[x.id] ? `Remove (moves ${nb(sc[x.id])} to ${esc(stLabel("tbr"))})` : "Remove"}</button></div>`).join("")}</div>
+    <form id="statusAdd" class="cat-add"><input id="newStatus" placeholder="Add a status, like Paused or Owned" aria-label="New status"><button class="btn" type="submit">Add</button></form>
+    <div class="foot"><span></span><button class="btn primary" data-act="close">Done</button></div>
+  </div>`;
+}
+async function renameGenre(i, val){
+  const gl = [...genreList()], old = gl[i]; val = String(val||"").trim();
+  if (!val || val === old){ renderModal(); return; }
+  if (gl.some((g,j) => j !== i && g.toLowerCase() === val.toLowerCase())){ toast(`${val} is already in the list`); renderModal(); return; }
+  gl[i] = val; saveSettings({genres: gl});
+  const hit = S.books.filter(b => b.genre === old);
+  for (const b of hit){ const {id, ...rest} = b; try { await saveBook(id, {...rest, genre: val}); } catch(_){} }
+  toast(hit.length ? `Renamed on ${hit.length} book${hit.length===1?"":"s"}` : "Genre renamed"); renderModal();
+}
+
+/* ---------- TBR shelves ---------- */
+const tbrShelves = () => Array.isArray(S.settings.tbrShelves) ? S.settings.tbrShelves : [];
+const shelvesFor = id => tbrShelves().filter(x => (x.books||[]).includes(id));
+function saveTbr(list){ saveSettings({tbrShelves: list}); }
+function tbrToggle(shelfId, bookId, on){
+  saveTbr(tbrShelves().map(x => { if (x.id !== shelfId) return x; const ids = (x.books||[]).filter(i => i !== bookId); if (on) ids.push(bookId); return {...x, books: ids}; }));
+}
+const TBR_IDEAS = ["Summer TBR","For when I need a good cry","Comfort reads","Spooky season","Book club picks","Short & quick"];
+function tbrHTML(){
+  if (!S.loaded && !S.noDb) return `<div class="panel empty">Opening your shelves…</div>`;
+  const list = tbrShelves(), byId = new Map(S.books.map(b => [b.id, b]));
+  const add = S.canWrite && !S.noDb ? `<button class="btn primary" data-act="tbr-new">+ New TBR shelf</button>` : "";
+  const ideas = S.canWrite ? `<div class="chips tbr-ideas">${TBR_IDEAS.filter(n => !list.some(x => x.name.toLowerCase() === n.toLowerCase())).map(n => `<button class="chip" data-act="tbr-quick" data-name="${esc(n)}">+ ${esc(n)}</button>`).join("")}</div>` : "";
+  if (!list.length) return `<div class="chal-empty">
+      <h2>No TBR shelves yet</h2>
+      <p>Make a shelf for any reading mood or plan, like a summer stack or the books you save for a good cry. A book can sit on as many shelves as you like.</p>${add}
+      ${ideas ? `<p class="mini" style="margin:8px 0 0">Or start with one of these:</p>${ideas}` : ""}</div>`;
+  return `<div class="chal-top"><p class="mini" style="margin:0">${list.length} shel${list.length===1?"f":"ves"}. Add books here, or from any book's page.</p>${add}</div>` +
+    list.map((x, si) => {
+      const books = (x.books||[]).map(id => byId.get(id)).filter(Boolean), read = books.filter(b => b.status === "finished").length;
+      return `<section class="panel tbr-shelf">
+        <div class="chal-h"><div style="min-width:0"><h2>${esc(x.name)}</h2>${x.note?`<p class="chal-d">${esc(x.note)}</p>`:""}<div class="mini num">${books.length} book${books.length===1?"":"s"}${read?` · ${read} read`:""}</div></div>
+          ${S.canWrite ? `<div class="grp"><button class="btn" data-act="tbr-add" data-id="${esc(x.id)}">Add books</button><button class="btn ghost" data-act="tbr-edit" data-id="${esc(x.id)}">Edit</button></div>` : ""}</div>
+        ${books.length ? `<div class="tbr-row">${books.map(b => `<div class="tbr-item${b.status==="finished"?" done":""}"><button class="cover-btn" data-act="open" data-id="${esc(b.id)}" aria-label="Open ${esc(b.title)}">${cover(b,"sm")}</button>${b.status==="finished"?`<span class="tbr-done">✓ Read</span>`:b.status==="reading"?`<span class="tbr-done reading">Reading</span>`:""}<div class="tbr-t">${esc(b.title)}</div></div>`).join("")}</div>`
+          : `<p class="mini" style="margin:12px 0 0">No books on this shelf yet.${S.canWrite?" Tap <b>Add books</b> to choose some from your library.":""}</p>`}
+      </section>`; }).join("") + (ideas && list.length < 12 ? `<div class="tbr-more"><span class="mini">More ideas:</span>${ideas}</div>` : "");
+}
+function tbrShelfHTML(){
+  const m = S.cm, x = tbrShelves().find(z => z.id === m.id) || {name:"", note:""};
+  return `<div class="sheet-h"><h2>${m.id ? "Edit shelf" : "New TBR shelf"}</h2><button class="x" data-act="close-tbr" aria-label="Close">×</button></div>
+  <div class="sheet-b"><form id="tbrShelfForm" autocomplete="off">
+    <div class="f"><label for="tbr-name">Shelf name</label><input id="tbr-name" required maxlength="80" value="${esc(x.name)}" placeholder="Summer TBR"></div>
+    <div class="f" style="margin-top:12px"><label for="tbr-note">Note <span class="mini">(optional)</span></label><input id="tbr-note" maxlength="200" value="${esc(x.note||"")}" placeholder="What goes on this shelf?"></div>
+    <div class="foot">${m.id ? `<button type="button" class="btn ghost danger" data-act="tbr-del">${m.armed ? "Tap again to delete" : "Delete shelf"}</button>` : "<span></span>"}<div class="grp"><button type="button" class="btn" data-act="close-tbr">Cancel</button><button class="btn primary" type="submit">${m.id ? "Save" : "Create shelf"}</button></div></div>
+    ${m.id ? `<p class="mini" style="margin:10px 0 0">Deleting a shelf doesn't delete any books.</p>` : ""}
+  </form></div>`;
+}
+function tbrPickListHTML(){
+  const m = S.cm, x = tbrShelves().find(z => z.id === m.id); if (!x) return "";
+  const on = new Set(x.books||[]), q = (m.q||"").toLowerCase();
+  const rank = b => on.has(b.id) ? 0 : b.status==="tbr" ? 1 : b.status==="reading" ? 2 : 3;
+  const list = S.books.filter(b => !q || [b.title,b.author,b.genre].some(v => String(v||"").toLowerCase().includes(q)))
+    .sort((a,b) => rank(a)-rank(b) || String(a.title).localeCompare(String(b.title)));
+  if (!list.length) return `<p class="mini">No books match. Add new books with <b>+ Add a book</b>, then put them on this shelf from their page.</p>`;
+  return list.map(b => `<label class="tbr-pick"><input type="checkbox" data-tbrbook="${esc(b.id)}" ${on.has(b.id)?"checked":""}>${cover(b,"sm")}<span style="min-width:0"><b>${esc(b.title)}</b><span class="mini">${esc(b.author||"")}${b.status!=="tbr"?` · ${esc(stLabel(b.status))}`:""}</span></span></label>`).join("");
+}
+function tbrPickHTML(){
+  const x = tbrShelves().find(z => z.id === S.cm.id) || {name:""};
+  return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">Add books</div><h2 style="margin-top:2px">${esc(x.name)}</h2></div><button class="x" data-act="close-tbr" aria-label="Close">×</button></div>
+  <div class="sheet-b"><input class="search" id="tbrQ" type="search" placeholder="Search your library" value="${esc(S.cm.q||"")}" aria-label="Search your library">
+    <p class="mini" style="margin:8px 0">Check every book that belongs on this shelf. Changes save as you go.</p>
+    <div class="tbr-pick-list" id="tbrPickList">${tbrPickListHTML()}</div>
+    <div class="foot"><span></span><button class="btn primary" data-act="close-tbr">Done</button></div></div>`;
+}
+
+/* ---------- audiobook editions (Hardcover) ---------- */
+async function hcBookId(b){
+  if (String(b.olKey||"").startsWith("hc:")) return Number(String(b.olKey).slice(3));
+  const d = await hcFind(String(b.title).replace(/\(.*?\)/g,"").split(":")[0].trim(), b.author);
+  return d ? Number(String(d.key).slice(3)) : 0;
+}
+async function runEditionSearch(){
+  const m = S.cm; if (!m || m.type !== "aed") return;
+  const b = S.books.find(x => x.id === m.id); if (!b) return;
+  m.loading = true; m.err = ""; renderModal();
+  const opts = [];
+  try {
+    const hid = await hcBookId(b);
+    if (hid){
+      const j = await getJSON(`${hcProxy()}?editions=${hid}`, null, 12000);
+      (j.editions || []).forEach(e => {
+        const what = e.info || (e.title && normT(e.title) !== normT(b.title) ? e.title : "") || "Standard audiobook";
+        const sub = [e.publisher, e.narrators && e.narrators.length ? "read by " + e.narrators.join(", ") : "", e.year].filter(Boolean).join(" · ");
+        opts.push({seconds: e.seconds, label: what, sub, tag: [what, e.publisher].filter(Boolean).join(" · ")});
+      });
+    }
+    // Some adaptations (dramatized versions especially) are listed on Hardcover as their own book
+    const t = String(b.title).replace(/\(.*?\)/g,"").split(":")[0].trim();
+    const more = await hcSearch(`${t} ${b.author||""}`.trim(), null, 8).catch(() => []);
+    more.filter(d => d._audio && Number(String(d.key).slice(3)) !== hid && normT(d.title).slice(0,12) === normT(t).slice(0,12))
+      .forEach(d => opts.push({seconds: d._audio, label: d.title, sub: "Listed separately on Hardcover", tag: d.title}));
+  } catch(e){ m.err = "Hardcover didn't answer. Try again in a moment, or type the length in yourself."; }
+  const seen = new Set(); m.opts = opts.filter(o => { const k = Math.round(o.seconds/60) + "|" + o.label + "|" + o.sub; if (seen.has(k)) return false; seen.add(k); return true; });
+  m.loading = false; if (S.cm === m) renderModal();
+}
+function aedHTML(){
+  const m = S.cm, b = S.books.find(x => x.id === m.id) || {};
+  const body = m.loading ? `<p class="mini">Looking up audiobook editions on Hardcover…</p>`
+    : m.err ? `<p class="err">${esc(m.err)}</p>`
+    : !m.opts.length ? `<p class="mini">Hardcover doesn't list a run time for any edition of this book. Close this and type the length in yourself.</p>`
+    : `<p class="mini" style="margin:0 0 10px">Pick the version you're listening to. Your place is kept.</p><div class="aed-list">${m.opts.map((o,i) => `<button class="aed-opt" data-act="aed-pick" data-i="${i}" aria-pressed="${Number(b.audioSeconds)===o.seconds}"><span><b>${esc(o.label)}</b>${o.sub?`<span class="mini">${esc(o.sub)}</span>`:""}</span><span class="num">${fmtDur(o.seconds)}${Number(b.audioSeconds)===o.seconds?` <span class="mini">✓ current</span>`:""}</span></button>`).join("")}</div>`;
+  return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">Audiobook edition</div><h2 style="margin-top:2px">${esc(b.title||"")}</h2></div><button class="x" data-act="close-aed" aria-label="Close">×</button></div>
+  <div class="sheet-b">${body}<div class="foot"><span></span><button class="btn" data-act="close-aed">Cancel</button></div></div>`;
+}
+
 /* ---------- audiobook time ---------- */
 const isAudio = b => b && b.format === "Audiobook";
 function fmtDur(sec){ sec = Math.max(0, Math.round(Number(sec)||0)); const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60); if (!h) return `${m} min`; return m ? `${h} hr ${m} min` : `${h} hr`; }
@@ -969,7 +1140,7 @@ function render(){
   $("#addBtn").hidden = !S.canWrite || S.noDb;
   $("#importBtn").hidden = !S.canWrite || S.noDb;
   renderNotice();
-  $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : libHTML();
+  $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML();
   if (S.tab==="dash" && S.loaded) queueSpineColors(finishedIn(S.year));
   if (S.tab==="lib") renderGrid();
   renderModal();
@@ -1037,12 +1208,12 @@ function dashHTML(){
   const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
   const tileList = [
     ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
+    ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span><span class="mini">${audioFin.length} audiobook${audioFin.length===1?"":"s"} finished${audioNow ? " + in progress" : ""}</span></div>`],
     ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
     ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
     ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
     ["t-spent",   `<div class="tile"><span class="eyebrow">Spent on books</span><span class="v num">${money(spent)}</span><span class="mini">books added in ${y}</span></div>`],
     ["t-length",  `<div class="tile"><span class="eyebrow">Avg length</span><span class="v num">${fin.length?Math.round(pages/fin.length):"—"} <small>pages</small></span></div>`],
-    ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span><span class="mini">${audioFin.length} audiobook${audioFin.length===1?"":"s"} finished${audioNow ? " + in progress" : ""}</span></div>`]
   ].filter(([k]) => show(k));
   // Fill every row with no holes: split tiles into rows of 2-4, each row stretched to the full width
   const tn = tileList.length, tRows = tn <= 3 ? 1 : tn <= 8 ? 2 : 3;
@@ -1133,13 +1304,14 @@ function libHTML(){
   return `<div class="toolbar">
       <input class="search" id="q" type="search" placeholder="Search titles, authors, notes" value="${esc(S.q)}" aria-label="Search your library">
       <select class="pill" id="fGenre" aria-label="Genre"><option value="">All genres</option>${genres.map(g=>`<option ${g===S.fGenre?"selected":""}>${esc(g)}</option>`).join("")}</select>
+      ${tbrShelves().length ? `<select class="pill" id="fTbr" aria-label="TBR shelf"><option value="">Any TBR shelf</option>${tbrShelves().map(x=>`<option value="${esc(x.id)}" ${S.fTbr===x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>` : ""}
       <select class="pill" id="fChal" aria-label="Challenge"><option value="">Any challenge status</option><option value="any" ${S.fChal==="any"?"selected":""}>In a challenge</option><option value="none" ${S.fChal==="none"?"selected":""}>Not in a challenge</option>${[...S.challenges].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(c=>`<option value="c:${esc(c.id)}" ${S.fChal==="c:"+c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
       ${S.canWrite && S.books.some(needsLookup) ? `<button class="btn" data-act="bulk-ol">Find covers &amp; details</button>` : ""}
       <select class="pill" id="sort" aria-label="Sort">
         ${[["added","Recently added"],["finished","Recently finished"],["title","Title A–Z"],["author","Author A–Z"],["rating","My highest rated"],["community","Goodreads rating"]].map(([v,l])=>`<option value="${v}" ${S.sort===v?"selected":""}>${l}</option>`).join("")}
       </select>
     </div>
-    <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${chip("reading","Reading")}${chip("tbr","Want to read")}${chip("finished","Finished")}${chip("dnf","Did not finish")}</div>
+    <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${allStatuses().map(([k,l]) => chip(k, esc(l))).join("")}</div>
     <div id="grid"></div>`;
 }
 
@@ -1157,7 +1329,7 @@ function renderGrid(){
   if (S.fChal.startsWith("c:") && !S.challenges.some(c=>"c:"+c.id===S.fChal)) S.fChal = "";
   const chalOk = b => !S.fChal || (S.fChal==="any" ? !!inChal[b.id] : S.fChal==="none" ? !inChal[b.id] : (inChal[b.id]||[]).some(x=>"c:"+x.c.id===S.fChal));
   let list = S.books.filter(b =>
-    (S.fStatus==="all" || b.status===S.fStatus) && (!S.fGenre || b.genre===S.fGenre) && chalOk(b) &&
+    (S.fStatus==="all" || b.status===S.fStatus) && (!S.fGenre || b.genre===S.fGenre) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
     (!q || [b.title,b.author,b.genre,b.series,b.review,b.notes,b.quote,b.summary,(b.moods||[]).join(" "),(b.tags||[]).join(" ")].some(x => String(x||"").toLowerCase().includes(q))));
   const by = {
     added:(a,b)=>(b.dateAdded||"").localeCompare(a.dateAdded||"") || (b.createdAt||0)-(a.createdAt||0),
@@ -1172,7 +1344,7 @@ function renderGrid(){
   g.innerHTML = `<div class="lib-count num">${list.length} book${list.length===1?"":"s"}</div><div class="grid">${list.map(b=>`
     <div class="card"><button class="cover-btn" data-act="open" data-id="${esc(b.id)}" aria-label="Open ${esc(b.title)}">${cover(b)}</button>
       <div><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div></div>
-      <div class="meta"><span class="status s-${esc(b.status)}">${esc(STATUS[b.status]||"")}</span>${b.rating?`<span class="stars">${stars(b.rating)}</span>`:""}</div>${chalBadge(inChal[b.id])}${b.communityRating?`<div class="community num">Goodreads <b>${Number(b.communityRating).toFixed(2)}</b></div>`:""}
+      <div class="meta"><span class="status ${stClass(b.status)}">${esc(stLabel(b.status))}</span>${b.rating?`<span class="stars">${stars(b.rating)}</span>`:""}</div>${chalBadge(inChal[b.id])}${b.communityRating?`<div class="community num">Goodreads <b>${Number(b.communityRating).toFixed(2)}</b></div>`:""}
     </div>`).join("")}</div>`;
 }
 
@@ -1183,7 +1355,7 @@ function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
   if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
   scrim.hidden = false; document.body.style.overflow="hidden";
-  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : S.cm.type==="dash" ? dashCustomHTML() : cmHTML(); return; }
+  if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : S.cm.type==="dash" ? dashCustomHTML() : S.cm.type==="cats" ? catsHTML() : S.cm.type==="tbrshelf" ? tbrShelfHTML() : S.cm.type==="tbrpick" ? tbrPickHTML() : S.cm.type==="aed" ? aedHTML() : cmHTML(); return; }
   if (S.openId==="import"){ sheet.innerHTML = importHTML(); return; }
   if (S.editing){ sheet.innerHTML = formHTML(); return; }
   const b = S.books.find(x=>x.id===S.openId);
@@ -1193,13 +1365,14 @@ function renderModal(){
   const pr = progressOf(b), tot = Number(b.audioSeconds)||0, pos = Number(b.audioPos)||0;
   const audioInputs = isAudio(b) ? (tot
       ? `<span class="mini">I'm at</span><input id="apH" type="number" min="0" class="hm" value="${secH(pos)}" aria-label="Hours listened"><span class="mini">hr</span><input id="apM" type="number" min="0" max="59" class="hm" value="${secM(pos)}" aria-label="Minutes listened"><span class="mini">min</span><button class="btn" data-act="save-audio">Update</button>`
-      : `<span class="mini">Audiobook length</span><input id="alH" type="number" min="0" class="hm" aria-label="Length hours"><span class="mini">hr</span><input id="alM" type="number" min="0" max="59" class="hm" aria-label="Length minutes"><span class="mini">min</span><button class="btn" data-act="save-audio-len">Save length</button>${hcProxy() ? `<button class="btn ghost" data-act="audio-lookup">Get it from Hardcover</button>` : ""}`) : "";
+      : `<span class="mini">Audiobook length</span><input id="alH" type="number" min="0" class="hm" aria-label="Length hours"><span class="mini">hr</span><input id="alM" type="number" min="0" max="59" class="hm" aria-label="Length minutes"><span class="mini">min</span><button class="btn" data-act="save-audio-len">Save length</button>${hcProxy() ? `<button class="btn ghost" data-act="aed">Find on Hardcover</button>` : ""}`) : "";
   const prog = b.status==="reading" ? `<div class="block"><div class="eyebrow">${isAudio(b) ? "Listening progress" : "Progress"}</div><div class="bar" style="height:8px"><i style="width:${pr.pc}%"></i></div>
       <div class="prog-row">${S.canWrite ? (isAudio(b) ? audioInputs : `<label for="curPage" class="mini">I'm on page</label><input id="curPage" type="number" min="0" ${p?`max="${p}"`:""} value="${c||""}"><button class="btn" data-act="save-page">Update</button>`) + `<button class="btn primary" data-act="finish">Mark finished</button>` : `<span class="mini num">${esc(pr.line)}</span>`}</div>
       <div class="mini num">${esc(pr.line)}${pr.left ? " · " + esc(pr.left) : ""}${isAudio(b) && !tot ? ". Enter the audiobook length above to track by time." : ""}</div></div>` : "";
   const quick = S.canWrite && b.status==="tbr" ? `<div class="block quick-row"><button class="btn primary" data-act="start">Start reading today</button>
       <label class="check upnext-check"><input type="checkbox" id="unToggle" ${inUpNext(b.id)?"checked":""}> <span><b>Up next</b><span class="mini" style="display:block">Show it in Up next on the dashboard</span></span></label></div>` : "";
-  sheet.innerHTML = `<div class="sheet-h"><span class="status s-${esc(b.status)}">${esc(STATUS[b.status])}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
+  const tbrBlock = S.canWrite && !S.noDb ? `<div class="block"><div class="eyebrow">TBR shelves</div><div class="tbr-chips">${tbrShelves().map(x => `<label class="tbr-chip"><input type="checkbox" data-tbrtoggle="${esc(x.id)}" ${(x.books||[]).includes(b.id)?"checked":""}> ${esc(x.name)}</label>`).join("")}<button class="btn ghost sm" data-act="tbr-new-for">+ New shelf</button></div></div>` : "";
+  sheet.innerHTML = `<div class="sheet-h"><span class="status ${stClass(b.status)}">${esc(stLabel(b.status))}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="detail">
     <div class="dcover">${cover(b)}${S.canWrite?`<button class="btn ghost switch-cover" data-act="covers">Switch cover</button>
       <button class="btn ghost switch-cover" data-act="spine-edit">Edit spine</button>`:""}</div>
@@ -1210,12 +1383,12 @@ function renderModal(){
       ${b.communityRating?`<div class="community num">Goodreads readers: <b>${Number(b.communityRating).toFixed(2)}</b>${b.communityAsOf?` (as of ${fmtDate(b.communityAsOf)})`:""}</div>`:""}
       ${summaryBlock(b)}
       ${S.canWrite && !b.olKey ? `<div class="block"><button class="btn" data-act="ol-lookup">Find cover &amp; details</button><span class="mini" style="margin-left:10px">Adds a cover, description and rating</span></div>` : ""}
-      ${prog}${quick}
+      ${prog}${quick}${tbrBlock}
       <div class="facts">
         <div><span>Genre</span><span>${esc(b.genre||"—")}</span></div>
         <div><span>Format</span><span>${esc(b.format||"—")}</span></div>
         <div><span>Pages</span><span class="num">${p||"—"}</span></div>
-        ${b.audioSeconds ? `<div><span>Audiobook length</span><span class="num">${fmtDur(b.audioSeconds)}</span></div>` : ""}
+        ${b.audioSeconds ? `<div><span>Audiobook length</span><span class="num">${fmtDur(b.audioSeconds)}</span>${b.audioEdition?`<span class="mini">${esc(b.audioEdition)}</span>`:""}${S.canWrite && hcProxy() && isAudio(b) ? `<button class="linkish" data-act="aed" style="align-self:flex-start">Change edition</button>` : ""}</div>` : ""}
         <div><span>Source</span><span>${esc(b.source||"—")}</span></div>
         <div><span>Started</span><span>${fmtDate(b.startDate)}</span></div>
         <div><span>Finished</span><span>${fmtDate(b.finishDate)}</span></div>
@@ -1257,8 +1430,8 @@ function formHTML(){
         </div></div>
       <div class="f full"><label for="f-title">Title</label><input id="f-title" name="title" required value="${esc(d.title)}"></div>
       <div class="f"><label for="f-author">Author</label><input id="f-author" name="author" value="${esc(d.author)}"></div>
-      <div class="f"><label for="f-genre">Genre</label><input id="f-genre" name="genre" list="genreList" value="${esc(d.genre)}"><datalist id="genreList">${GENRES.map(g=>`<option value="${esc(g)}">`).join("")}</datalist></div>
-      <div class="f"><label for="f-status">Status</label><select id="f-status" name="status">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${k===d.status?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="f"><label for="f-genre">Genre</label><select id="f-genre" name="genre"><option value="">—</option>${[...genreList(), ...(d.genre && !genreList().includes(d.genre) ? [d.genre] : [])].map(g=>`<option value="${esc(g)}" ${g===d.genre?"selected":""}>${esc(g)}</option>`).join("")}<option value="__other">Something else…</option></select><input id="f-genreOther" name="genreOther" placeholder="Type a genre" aria-label="Your own genre" hidden style="margin-top:6px"></div>
+      <div class="f"><label for="f-status">Status</label><select id="f-status" name="status">${allStatuses().map(([k,l])=>`<option value="${k}" ${k===d.status?"selected":""}>${l}</option>`).join("")}</select></div>
       <div class="f"><label for="f-rating">Rating</label><select id="f-rating" name="rating">${ratingOpts}</select></div>
       <div class="f"><label for="f-format">Format</label><select id="f-format" name="format">${opt(FORMATS,d.format)}</select></div>
       <div class="f"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">—</option>${opt(SOURCES,d.source)}</select></div>
@@ -1290,6 +1463,8 @@ function readForm(){
   for (const [k,v] of fd.entries()) S.draft[k] = typeof v==="string" ? v : S.draft[k];
   if (f.elements.aLenH){ S.draft.audioSeconds = hmToSec(S.draft.aLenH, S.draft.aLenM) || ""; S.draft.audioPos = hmToSec(S.draft.aPosH, S.draft.aPosM) || ""; }
   ["aLenH","aLenM","aPosH","aPosM"].forEach(k => delete S.draft[k]);
+  if (S.draft.genre === "__other") S.draft.genre = String(S.draft.genreOther||"").trim();
+  delete S.draft.genreOther;
 }
 
 function clean(d){
@@ -1311,7 +1486,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-m";
+const APP_VERSION = "2026.10.08-p";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1405,7 +1580,11 @@ function cleanDesc(d){
   return t;
 }
 const GENRE_RULES = [
-  [/juvenile|young adult|children'?s|picture books/i, "Children's / YA"],
+  [s => /romantasy/i.test(s) || (/romance|love stories/i.test(s) && /fantasy|\bfae\b|dragons/i.test(s)), "Romantasy"],
+  [/young adult|\bteen\b/i, "Young adult"],
+  [/picture books|board books|early readers?|beginning readers?/i, "Children's"],
+  [/middle grade|juvenile/i, "Middle grade"],
+  [/children'?s/i, "Children's"],
   [/\bpoetry\b|\bpoems\b/i, "Poetry"],
   [/teaching|\beducation\b|pedagog|literacy/i, "Education"],
   [/autobiograph|memoir/i, "Memoir"],
@@ -1416,7 +1595,7 @@ const GENRE_RULES = [
   [/historical fiction|fiction, historical/i, "Historical fiction"],
   [/biograph|\bhistory\b|science|psychology|self-help|essays|nonfiction|social|politic/i, "Nonfiction"],
   [/fiction/i, "Literary fiction"]];
-function guessGenre(subjects){ const s = (subjects || []).slice(0, 40).join(" | "); for (const [re, g] of GENRE_RULES) if (re.test(s)) return g; return ""; }
+function guessGenre(subjects){ const s = (subjects || []).slice(0, 40).join(" | "); for (const [re, g] of GENRE_RULES) if (typeof re === "function" ? re(s) : re.test(s)) return g; return ""; }
 function olPatch(d, work, base, overwrite){
   const p = { olKey: d.key, olCover: d.cover_i || base.olCover || "", coverUrl: d.cover_url || base.coverUrl || "",
     olRating: d.ratings_average ? Math.round(d.ratings_average * 100) / 100 : "", olRatingCount: d.ratings_count || "", ratingSource: d._src || "Open Library" };
@@ -1523,6 +1702,7 @@ function accountHTML(){
     ${appearanceHTML()}
     <div class="acct-list">
       <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without covers or details yet`:"Every book has been checked"}</span></button>
+      <button class="acct-row" data-act="cats"><b>Genres &amp; statuses</b><span class="mini">Add, rename or remove the choices in those menus</span></button>
       <button class="acct-row" data-act="dash-custom"><b>Customize dashboard</b><span class="mini">Choose which sections and stats to show</span></button>
       <button class="acct-row" data-act="import"><b>Import books</b><span class="mini">From Goodreads, StoryGraph or a Nightstand backup</span></button>
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
@@ -1800,7 +1980,7 @@ function pickListHTML(){
   if (!list.length) return `<p class="empty">No books match. Use <b>Add a new book</b> to add it.</p>`;
   return `<div class="pick-list">${list.slice(0,200).map(b=>`<button class="pick-row" data-act="slot-set" data-id="${esc(b.id)}">${cover(b,"sm")}
     <span style="min-width:0"><span class="t">${esc(b.title)}</span><span class="a">${esc(b.author||"")}</span></span>
-    <span class="r"><span class="status s-${esc(b.status)}">${esc(STATUS[b.status]||"")}</span>${used[b.id]?`<span class="mini">in spot ${used[b.id]}</span>`:""}</span></button>`).join("")}</div>`;
+    <span class="r"><span class="status ${stClass(b.status)}">${esc(stLabel(b.status))}</span>${used[b.id]?`<span class="mini">in spot ${used[b.id]}</span>`:""}</span></button>`).join("")}</div>`;
 }
 function readChal(){
   const f = $("#chalForm"); if(!f || S.cm?.type!=="form") return;
@@ -1872,6 +2052,26 @@ document.addEventListener("click", async e => {
   if (act==="un-reorder"){ S.unReorder = !S.unReorder; render(); if (!S.unReorder) toast("Up next order saved"); return; }
   if (act==="un-move"){ const ids = upNextList().map(b => b.id); const i = ids.indexOf(el.dataset.id), j = i + Number(el.dataset.d);
     if (i >= 0 && j >= 0 && j < ids.length){ ids.splice(i, 1); ids.splice(j, 0, el.dataset.id); saveUpNext([...ids, ...(S.settings.upNext || []).filter(id => !ids.includes(id))]); render(); } return; }
+  if (act==="tbr-new"){ S.openId=null; S.cm={type:"tbrshelf"}; renderModal(); $("#tbr-name")?.focus(); return; }
+  if (act==="tbr-new-for"){ const id=S.openId; S.openId=null; S.cm={type:"tbrshelf", forBook:id}; renderModal(); $("#tbr-name")?.focus(); return; }
+  if (act==="tbr-edit"){ S.openId=null; S.cm={type:"tbrshelf", id:el.dataset.id}; renderModal(); return; }
+  if (act==="tbr-add"){ S.openId=null; S.cm={type:"tbrpick", id:el.dataset.id, q:""}; renderModal(); return; }
+  if (act==="tbr-quick"){ const name = el.dataset.name; if (!tbrShelves().some(x => x.name.toLowerCase()===name.toLowerCase())) saveTbr([...tbrShelves(), {id:"t"+Date.now().toString(36), name, note:"", books:[], createdAt:Date.now()}]); toast(`${name} shelf added`); render(); return; }
+  if (act==="close-tbr"){ const back = S.cm?.forBook; S.cm=null; S.openId = back || null; render(); return; }
+  if (act==="tbr-del"){ const m=S.cm; if (!m.armed){ m.armed=true; renderModal(); return; } const x = tbrShelves().find(z => z.id===m.id); saveTbr(tbrShelves().filter(z => z.id!==m.id)); S.cm=null; toast(`Deleted ${x ? x.name : "shelf"}`); render(); return; }
+  if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
+  if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
+  if (act==="genre-del"){ const gl = [...genreList()]; gl.splice(Number(el.dataset.i), 1); saveSettings({genres: gl}); renderModal(); return; }
+  if (act==="genre-add-un"){ rememberGenre(el.dataset.g); renderModal(); return; }
+  if (act==="genre-defaults"){ const gl = [...genreList()]; GENRES.forEach(g => { if (!gl.includes(g)) gl.push(g); }); saveSettings({genres: gl}); renderModal(); return; }
+  if (act==="st-del"){ const list = [...customStatuses()], x = list.splice(Number(el.dataset.i), 1)[0]; if (!x) return; saveSettings({statuses: list});
+    const hit = S.books.filter(b => b.status === x.id); for (const b of hit){ const {id, ...rest} = b; try { await saveBook(id, {...rest, status: "tbr"}); } catch(_){} }
+    if (S.fStatus === x.id) S.fStatus = "all"; toast(hit.length ? `Removed. ${hit.length} book${hit.length===1?"":"s"} moved to ${stLabel("tbr")}` : "Status removed"); render(); renderModal(); return; }
+  if (act==="aed"){ const b=S.books.find(x=>x.id===S.openId); if(!b) return; S.cm={type:"aed", id:b.id, opts:[], loading:true}; renderModal(); runEditionSearch(); return; }
+  if (act==="close-aed"){ const id=S.cm?.id; S.cm=null; S.openId=id||null; renderModal(); return; }
+  if (act==="aed-pick"){ const m=S.cm, o=m && m.opts[Number(el.dataset.i)]; if(!o) return; const b=S.books.find(x=>x.id===m.id); if(!b) return;
+    S.cm=null; S.openId=b.id; const pos = Number(b.audioPos)||0;
+    await patch(b.id, {audioSeconds:o.seconds, audioEdition:o.tag, audioLookup:today(), ...(pos > o.seconds ? {audioPos:o.seconds} : {})}); toast(`Using ${o.label}: ${fmtDur(o.seconds)}`); renderModal(); return; }
   if (act==="dash-custom"){ S.openId=null; S.cm={type:"dash"}; renderModal(); return; }
   if (act==="dash-showall"){ saveDashHidden([]); renderModal(); return; }
   if (act==="look-theme"){ saveLook({theme: el.dataset.k}); return; }
@@ -1994,10 +2194,17 @@ document.addEventListener("click", async e => {
 document.addEventListener("submit", async e => {
   if (e.target.id==="coverSearch"){ e.preventDefault(); S.cm.q = $("#coverQ").value.trim() || S.cm.q; runCoverSearch(); return; }
   if (e.target.id==="chalForm"){ e.preventDefault(); saveChallenge(); return; }
+  if (e.target.id==="tbrShelfForm"){ e.preventDefault(); const m=S.cm, name=$("#tbr-name").value.trim(), note=$("#tbr-note").value.trim(); if (!name) return;
+    if (tbrShelves().some(x => x.id!==m.id && x.name.toLowerCase()===name.toLowerCase())){ toast(`You already have a shelf called ${name}`); return; }
+    if (m.id) saveTbr(tbrShelves().map(x => x.id===m.id ? {...x, name, note} : x));
+    else saveTbr([...tbrShelves(), {id:"t"+Date.now().toString(36), name, note, books: m.forBook ? [m.forBook] : [], createdAt:Date.now()}]);
+    toast(m.id ? "Shelf saved" : m.forBook ? `Added to ${name}` : `${name} shelf created`); S.cm=null; S.openId = m.forBook || null; render(); return; }
+  if (e.target.id==="genreAdd"){ e.preventDefault(); const v = $("#newGenre").value.trim(); if (!v) return; if (genreList().some(g => g.toLowerCase() === v.toLowerCase())){ toast(`${v} is already in the list`); return; } rememberGenre(v); renderModal(); $("#newGenre")?.focus(); return; }
+  if (e.target.id==="statusAdd"){ e.preventDefault(); const v = $("#newStatus").value.trim(); if (!v) return; if (allStatuses().some(([,l]) => l.toLowerCase() === v.toLowerCase())){ toast(`${v} is already a status`); return; } saveSettings({statuses: [...customStatuses(), {id: "c" + Date.now().toString(36), name: v}]}); render(); renderModal(); $("#newStatus")?.focus(); return; }
   if (e.target.id!=="bookForm") return;
   e.preventDefault(); readForm();
   if (!S.draft.title.trim()){ S.err="Give the book a title."; renderModal(); return; }
-  const data = clean(S.draft); delete data.example;
+  const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);
@@ -2014,6 +2221,13 @@ document.addEventListener("change", async e => {
     if (e.target.checked) hidden.delete(k); else hidden.add(k);
     saveDashHidden([...hidden]);
   }
+  if (e.target.dataset && e.target.dataset.tbrtoggle && S.openId){ const x = tbrShelves().find(z => z.id===e.target.dataset.tbrtoggle); tbrToggle(e.target.dataset.tbrtoggle, S.openId, e.target.checked); toast(e.target.checked ? `Added to ${x?x.name:"shelf"}` : `Removed from ${x?x.name:"shelf"}`); render(); return; }
+  if (e.target.dataset && e.target.dataset.tbrbook && S.cm?.type==="tbrpick"){ tbrToggle(S.cm.id, e.target.dataset.tbrbook, e.target.checked); return; }
+  if (e.target.id==="fTbr"){ S.fTbr=e.target.value; renderGrid(); return; }
+  if (e.target.id==="f-genre"){ const o = $("#f-genreOther"); if (o){ o.hidden = e.target.value !== "__other"; if (!o.hidden) o.focus(); } return; }
+  if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
+  if (e.target.dataset && e.target.dataset.st && S.cm?.type==="cats"){ const k = e.target.dataset.st, v = e.target.value.trim(); const n = {...(S.settings.statusNames||{})}; if (!v || v === STATUS[k]) delete n[k]; else n[k] = v; saveSettings({statusNames: n}); render(); renderModal(); return; }
+  if (e.target.dataset && e.target.dataset.cstI !== undefined && S.cm?.type==="cats"){ const v = e.target.value.trim(), list = customStatuses().map(x => ({...x})), i = Number(e.target.dataset.cstI); if (v && list[i]){ list[i].name = v; saveSettings({statuses: list}); render(); } renderModal(); return; }
   if (e.target.id==="f-format" && S.editing){ readForm(); renderModal(); $("#f-format")?.focus(); }
   if (e.target.id==="unToggle" && S.openId){
     const id = S.openId, ids = (S.settings.upNext || []).filter(x => x !== id);
@@ -2056,6 +2270,7 @@ document.addEventListener("change", async e => {
   }
 });
 document.addEventListener("input", e => {
+  if (e.target.id==="tbrQ" && S.cm?.type==="tbrpick"){ S.cm.q = e.target.value; const l = $("#tbrPickList"); if (l) l.innerHTML = tbrPickListHTML(); return; }
   if (S.cm?.type==="spine" && e.target.closest && e.target.closest("#spineForm")){
     const d = S.cm.d, id = e.target.id, v = e.target.value;
     if (id==="sp-color"){ d.colorManual = true; d.color = v; }
@@ -2139,14 +2354,14 @@ window.NSApp = {
       if (S.editing) readForm();
       if (S.cm?.type==="form") readChal();
       if (S.cm?.type==="bulk" || S.cm?.type==="account"){ if (S.tab!=="chal") $("#view").innerHTML = S.tab==="dash" ? dashHTML() : libHTML(), S.tab==="lib" && renderGrid(); else $("#view").innerHTML = chalHTML(); return; }
-      if (S.editing && document.activeElement && document.activeElement.closest && document.activeElement.closest("#bookForm")) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
+      if (S.editing && document.activeElement && document.activeElement.closest && document.activeElement.closest("#bookForm")) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
       render();
     }, err => { S.loaded = true; denied(err); render(); }));
     S.unsubs.push(S.db.collection("challenges").onSnapshot(snap => {
       S.challenges = snap.docs.map(d => ({id:d.id, ...d.data()}));
       if (S.cm?.type==="form") readChal();
       if (S.cm?.type==="pick"){ const q=$("#pickQ"); if (q && document.activeElement===q){ if (S.tab==="chal") $("#view").innerHTML = chalHTML(); return; } }
-      if (S.editing || S.cm) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
+      if (S.editing || S.cm) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
       render();
     }, ()=>{}));
     S.unsubs.push(S.db.collection("covers").onSnapshot(snap => {
