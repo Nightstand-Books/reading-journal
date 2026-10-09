@@ -119,6 +119,8 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .sc-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
 .sc-ctl input[type=color]{width:44px;height:32px;padding:0 2px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer}
 .sc-ctl input[type=range]{flex:1 1 120px;min-width:0;accent-color:var(--accent)}
+.sc-auto{flex:0 0 58px;display:inline-flex}
+@media (min-width:601px){.sc-range{flex-wrap:nowrap}}
 .sc-ctl select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;min-width:0;max-width:100%}
 .sc-val{font-size:13px;min-width:44px;font-variant-numeric:tabular-nums}
 .sc-num{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
@@ -698,7 +700,7 @@ function spineEditHTML(){
   const m = S.cm, b = S.books.find(x => x.id === m.id); if (!b) return "";
   const d = m.d, mb = spineMerged(b, d), L = spineLayout(mb);
   const pages = Number(b.pages);
-  const auto = (on, act) => on ? `<button type="button" class="linkish" data-act="${act}">Auto</button>` : `<span class="sc-tag">Auto</span>`;
+  const auto = (on, act) => `<span class="sc-auto">${on ? `<button type="button" class="linkish" data-act="${act}">Auto</button>` : `<span class="sc-tag">Auto</span>`}</span>`;
   return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">Edit spine</div><h2 style="margin-top:2px">${esc(b.title)}</h2></div><button class="x" data-act="close-spine" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="spine-edit">
     <div class="spine-stage"><div class="shelf preview" id="spinePreview">${spine(mb)}</div><p class="mini">Preview at shelf size</p></div>
@@ -706,8 +708,8 @@ function spineEditHTML(){
       <div class="sc-row"><label for="sp-color">Spine color</label><div class="sc-ctl"><input type="color" id="sp-color" value="${esc(spineHexOf(mb))}">${d.colorManual?`<button type="button" class="linkish" data-act="sp-color-auto">Match cover</button>`:`<span class="sc-tag">Matches cover</span>`}</div></div>
       <div class="sc-row"><label for="sp-text">Text color</label><div class="sc-ctl"><input type="color" id="sp-text" value="${esc(d.textManual ? d.textColor : textOn(spineHexOf(mb)))}">${auto(d.textManual, "sp-text-auto")}</div></div>
       <div class="sc-row"><label for="sp-font">Font</label><div class="sc-ctl"><select id="sp-font">${Object.entries(SPINE_FONTS).map(([k,f])=>`<option value="${k}" ${k===d.font?"selected":""}>${f.label}</option>`).join("")}</select></div></div>
-      <div class="sc-row"><label for="sp-h">Height</label><div class="sc-ctl"><input type="range" id="sp-h" min="80" max="136" step="1" value="${L.ht}" aria-label="Height slider"><span class="sc-num"><input type="number" id="sp-h-num" min="80" max="136" step="1" value="${L.ht}" inputmode="numeric" aria-label="Height in pixels">px</span>${auto(!!d.height, "sp-h-auto")}</div></div>
-      <div class="sc-row"><label for="sp-w">Width</label><div class="sc-ctl"><input type="range" id="sp-w" min="12" max="80" step="1" value="${L.w}" aria-label="Width slider"><span class="sc-num"><input type="number" id="sp-w-num" min="12" max="80" step="1" value="${L.w}" inputmode="numeric" aria-label="Width in pixels">px</span>${auto(!!d.width, "sp-w-auto")}</div>
+      <div class="sc-row"><label for="sp-h">Height</label><div class="sc-ctl sc-range"><input type="range" id="sp-h" min="80" max="136" step="1" value="${L.ht}" aria-label="Height slider"><span class="sc-num"><input type="number" id="sp-h-num" min="80" max="136" step="1" value="${L.ht}" inputmode="numeric" aria-label="Height in pixels">px</span>${auto(!!d.height, "sp-h-auto")}</div></div>
+      <div class="sc-row"><label for="sp-w">Width</label><div class="sc-ctl sc-range"><input type="range" id="sp-w" min="12" max="80" step="1" value="${L.w}" aria-label="Width slider"><span class="sc-num"><input type="number" id="sp-w-num" min="12" max="80" step="1" value="${L.w}" inputmode="numeric" aria-label="Width in pixels">px</span>${auto(!!d.width, "sp-w-auto")}</div>
         <div class="sc-hint" id="sp-w-hint">${d.width ? "Set by hand." : pages ? `Auto width follows the page count (${pages} pages).` : "Add a page count to the book and auto width will follow it."}</div></div>
     </form>
   </div>
@@ -1353,6 +1355,7 @@ function blank(){ return {title:"",author:"",genre:"",format:"Print",status:"tbr
 
 function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
+  queueMicrotask(() => { if (!sheet.querySelector(FORM_SEL)) S.dirty = false; });
   if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
   scrim.hidden = false; document.body.style.overflow="hidden";
   if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : S.cm.type==="dash" ? dashCustomHTML() : S.cm.type==="cats" ? catsHTML() : S.cm.type==="tbrshelf" ? tbrShelfHTML() : S.cm.type==="tbrpick" ? tbrPickHTML() : S.cm.type==="aed" ? aedHTML() : cmHTML(); return; }
@@ -1486,7 +1489,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-p";
+const APP_VERSION = "2026.10.08-r";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2293,7 +2296,8 @@ document.addEventListener("input", e => {
   if (e.target.id==="q"){ S.q=e.target.value; renderGrid(); }
   if (e.target.id==="pickQ" && S.cm){ S.cm.q=e.target.value; $("#pickList").innerHTML = pickListHTML(); }
 });
-function dismiss(){ if (S.imp?.stage==="running") return; if (S.sum) S.sum.ctl?.abort?.(); S.sum=null; S.imp=null; S.cm=null; S.pendingSlot=null; S.openId=null; S.editing=false; renderModal(); }
+function dismiss(soft){ if (S.imp?.stage==="running") return;
+  if (soft && S.dirty && $("#sheet").querySelector(FORM_SEL)){ toast("You have unsaved changes. Save them, or use Cancel to discard."); return; } if (S.sum) S.sum.ctl?.abort?.(); S.sum=null; S.imp=null; S.cm=null; S.pendingSlot=null; S.openId=null; S.editing=false; renderModal(); }
 /* bookcase editing: drag books, decor and bookends anywhere, across shelves and into the tray */
 document.addEventListener("pointerdown", e => {
   if (!S.shelfEdit) return;
@@ -2327,14 +2331,21 @@ document.addEventListener("keydown", e => {
   e.preventDefault(); $(`[data-act="sel-move"][data-d="${e.key==="ArrowLeft"?-1:1}"]`)?.click();
 });
 document.addEventListener("keydown", e => {
-  if (e.key==="Escape" && (S.openId||S.cm)) dismiss();
+  if (e.key==="Escape" && (S.openId||S.cm)) dismiss(true);
   if (e.key==="Enter" && e.target.id==="olq"){ e.preventDefault(); clearTimeout(S.ol.t); runOlSearch(); }
 });
 window.addEventListener("ns-write-error", e => toast(writeErr(e.detail)));
 const setOnline = () => { const o=$("#offline"); if(o) o.hidden = navigator.onLine; };
 window.addEventListener("online", setOnline); window.addEventListener("offline", setOnline);
 if ("serviceWorker" in navigator && location.protocol==="https:") window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
-$("#scrim").addEventListener("click", e => { if (e.target.id==="scrim") dismiss(); });
+// Only close when the press both starts and ends on the dimmed background,
+// so dragging to select text and letting go outside the box doesn't close it.
+let scrimDown = false;
+$("#scrim").addEventListener("pointerdown", e => { scrimDown = e.target.id === "scrim"; });
+$("#scrim").addEventListener("click", e => { const ok = scrimDown && e.target.id === "scrim"; scrimDown = false; if (ok) dismiss(true); });
+const FORM_SEL = "#bookForm, #chalForm, #tbrShelfForm";
+document.addEventListener("input", e => { if (e.target.closest && e.target.closest(FORM_SEL)) S.dirty = true; }, true);
+document.addEventListener("change", e => { if (e.target.closest && e.target.closest(FORM_SEL)) S.dirty = true; }, true);
 
 /* ---------- boot ---------- */
 function stopListening(){ S.unsubs.forEach(u => { try { u(); } catch {} }); S.unsubs = []; }
