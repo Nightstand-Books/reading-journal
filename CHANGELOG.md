@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.25.0 (October 8, 2026)
+- New **Avg days per book** stat tile: the average number of days from start to finish for that year's finished books, counting the start and finish days. Books with an estimated or missing start or finish date are left out. It can be hidden in Customize dashboard.
+
 ## 1.24.0 (October 8, 2026)
 - Audiobooks have a **Listening speed** field in Edit book (for example 1.5 for one and a half speed). It shows in the book's details.
 - New **Avg listening speed** stat tile on the dashboard, next to Hours listened. It averages the audiobooks you finished that year, plus the ones you're listening to now in the current year. It can be hidden in Customize dashboard.

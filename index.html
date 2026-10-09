@@ -990,7 +990,7 @@ document.addEventListener("pointerup", endUnDrag); document.addEventListener("po
 /* ---------- customize dashboard ---------- */
 const DASH_PARTS = [
   ["Sections", [["goal","Reading goal"],["shelf","Bookcase"],["nightstand","On the nightstand"],["monthly","Books finished by month"],["genres","What you read (genres and formats)"],["moods","How your reading felt (moods)"],["pace","Pace"]]],
-  ["Stat tiles", [["t-pages","Pages read"],["t-hours","Hours listened"],["t-speed","Avg listening speed"],["t-rating","Average rating"],["t-reading","Reading now"],["t-tbr","Want to read"],["t-spent","Spent on books"],["t-length","Avg length"]]]
+  ["Stat tiles", [["t-pages","Pages read"],["t-hours","Hours listened"],["t-speed","Avg listening speed"],["t-days","Avg days per book"],["t-rating","Average rating"],["t-reading","Reading now"],["t-tbr","Want to read"],["t-spent","Spent on books"],["t-length","Avg length"]]]
 ];
 function dashCustomHTML(){
   const hidden = new Set(S.settings.dashHidden || []);
@@ -1306,6 +1306,9 @@ function dashHTML(){
   const hidden = new Set(S.settings.dashHidden || []), show = k => !hidden.has(k);
   const audioFin = fin.filter(b => isAudio(b) && Number(b.audioSeconds));
   const speedList = [...fin, ...(y === thisYear ? reading : [])].filter(b => isAudio(b) && Number(b.audioSpeed));
+  const dayOf = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d||"")) ? Date.UTC(+d.slice(0,4), +d.slice(5,7) - 1, +d.slice(8,10)) / 864e5 : null;
+  const readSpans = fin.map(b => { const a = dayOf(b.startDate), z = dayOf(b.finishDate); return a !== null && z !== null && z >= a ? z - a + 1 : null; }).filter(v => v !== null);
+  const avgDays = readSpans.length ? readSpans.reduce((t, v) => t + v, 0) / readSpans.length : 0;
   const avgSpeed = speedList.length ? speedList.reduce((t, b) => t + Number(b.audioSpeed), 0) / speedList.length : 0;
   const audioNowList = reading.filter(b => isAudio(b) && Number(b.audioPos)), audioNow = audioNowList.length;
   const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
@@ -1313,6 +1316,7 @@ function dashHTML(){
     ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
     ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span></div>`],
     ["t-speed",   `<div class="tile"><span class="eyebrow">Avg listening speed</span><span class="v num">${avgSpeed ? fmtSpeed(avgSpeed) : "—"}</span></div>`],
+    ["t-days",    `<div class="tile"><span class="eyebrow">Avg days per book</span><span class="v num">${avgDays ? (avgDays < 10 ? Math.round(avgDays * 10) / 10 : Math.round(avgDays)) : "—"} ${avgDays ? `<small>day${Math.round(avgDays * 10) / 10 === 1 ? "" : "s"}</small>` : ""}</span></div>`],
     ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
     ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
     ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
@@ -1681,7 +1685,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.24.0";
+const APP_VERSION = "1.25.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
