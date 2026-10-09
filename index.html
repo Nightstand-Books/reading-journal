@@ -1593,7 +1593,8 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-za";
+const APP_VERSION = "1.0.0";
+const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1815,7 +1816,7 @@ function accountHTML(){
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
       <button class="acct-row" data-act="signout"><b>Sign out</b><span class="mini">Your books stay saved in your account</span></button>
     </div>
-    <p class="mini" style="margin:12px 0 0">Nightstand version ${APP_VERSION} · Hardcover ${hcProxy() ? "connected" : "not connected"} · Google Books key ${window.GOOGLE_BOOKS_KEY ? "added" : "not added"}</p>
+    <p class="mini" style="margin:12px 0 0">Nightstand version ${APP_VERSION} (<a href="${CHANGELOG_URL}" target="_blank" rel="noopener">what's new</a>) · Hardcover ${hcProxy() ? "connected" : "not connected"} · Google Books key ${window.GOOGLE_BOOKS_KEY ? "added" : "not added"}</p>
   </div>`;
 }
 function bulkHTML(){
