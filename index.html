@@ -630,7 +630,7 @@ function yearsAvailable(){
   S.books.forEach(b => { [b.finishDate,b.startDate,b.dateAdded].forEach(d => { const y=yr(d); if(y) ys.add(y); }); });
   return [...ys].sort((a,b)=>b-a);
 }
-function finishedIn(y){ return S.books.filter(b => b.status==="finished" && yr(b.finishDate)===y).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
+function finishedIn(y){ return S.books.filter(b => b.status==="finished" && (y === "all" || yr(b.finishDate)===y)).sort((a,b)=> (a.finishDate||"").localeCompare(b.finishDate||"")); }
 
 /* ---------- bookcase: shelves, decor, bookends ---------- */
 const DECOR = {
@@ -1279,7 +1279,7 @@ function paintView(keep = true){
 function render(){
   if (shelfDrag || (unDrag && unDrag.started) || (nsDrag && nsDrag.started)) { renderModal(); return; }
   const ys = yearsAvailable();
-  $("#yearSel").innerHTML = ys.map(y=>`<option value="${y}" ${y===S.year?"selected":""}>${y}</option>`).join("");
+  $("#yearSel").innerHTML = ys.map(y=>`<option value="${y}" ${y===S.year?"selected":""}>${y}</option>`).join("") + `<option value="all" ${S.year==="all"?"selected":""}>All time</option>`;
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===S.tab)));
   $("#addBtn").hidden = !S.canWrite || S.noDb;
   renderNotice();
@@ -1298,14 +1298,14 @@ function renderNotice(){
 
 function dashHTML(){
   if (!S.loaded && !S.noDb) return `<div class="panel empty">Opening your journal…</div>`;
-  const y = S.year, fin = finishedIn(y);
-  const goal = Number(S.settings.goals?.[y]) || 0;
+  const y = S.year, fin = finishedIn(y), all = y === "all", yl = all ? "All-time" : y, live = all || y === thisYear;
+  const goal = all ? 0 : Number(S.settings.goals?.[y]) || 0;
   const pages = fin.reduce((s,b)=>s+(Number(b.pages)||0),0);
   const rated = fin.filter(b=>Number(b.rating)>0);
   const avg = rated.length ? rated.reduce((s,b)=>s+Number(b.rating),0)/rated.length : 0;
   const reading = nightOrdered(S.books.filter(b=>b.status==="reading"));
   const tbr = S.books.filter(b => b.status === "tbr"), un = upNextList();
-  const spent = S.books.filter(b=>yr(b.dateAdded)===y).reduce((s,b)=>s+(Number(b.cost)||0),0);
+  const spent = S.books.filter(b=>all || yr(b.dateAdded)===y).reduce((s,b)=>s+(Number(b.cost)||0),0);
   const both = rated.filter(b=>Number(b.communityRating)>0);
   let commLine = "";
   if (both.length){
@@ -1333,7 +1333,12 @@ function dashHTML(){
   const goalEdit = S.editingGoal
     ? `<div class="goal-edit"><input id="goalInput" type="number" min="1" max="999" value="${goal||""}" aria-label="Books goal for ${y}"><button class="btn primary" data-act="save-goal">Save</button><button class="btn ghost" data-act="cancel-goal">Cancel</button></div>`
     : (S.canWrite && !S.noDb ? `<div style="margin-top:8px"><button class="linkish" data-act="edit-goal">${goal?"Change goal":"Set a goal for "+y}</button></div>` : "");
-  const goalPanel = `<section class="panel"><div class="panel-h"><span class="eyebrow">${y} reading goal</span></div>
+  const byYr = {}; fin.forEach(b => { const k = yr(b.finishDate); if (k) byYr[k] = (byYr[k]||0) + 1; });
+  const bestYr = Object.entries(byYr).sort((a,b) => b[1]-a[1] || b[0]-a[0])[0], nYrs = Object.keys(byYr).length;
+  const goalPanel = all ? `<section class="panel"><div class="panel-h"><span class="eyebrow">All-time reading</span></div>
+    <div class="goal"><div><div class="big num">${fin.length.toLocaleString()}</div>
+      <div class="pace">book${fin.length===1?"":"s"} finished${nYrs ? ` across ${nYrs} year${nYrs===1?"":"s"}` : ""}.${bestYr && nYrs > 1 ? ` Your biggest year was ${bestYr[0]}, with ${bestYr[1]}.` : ""}</div></div></div></section>`
+  : `<section class="panel"><div class="panel-h"><span class="eyebrow">${y} reading goal</span></div>
     <div class="goal">
       <svg class="ring" width="112" height="112" viewBox="0 0 112 112" role="img" aria-label="${fin.length} of ${goal||"no"} books">
         <circle cx="56" cy="56" r="${R}" fill="none" stroke="var(--sunk)" stroke-width="10"/>
@@ -1347,13 +1352,13 @@ function dashHTML(){
 
   const hidden = new Set(S.settings.dashHidden || []), show = k => !hidden.has(k);
   const audioFin = fin.filter(b => isAudio(b) && Number(b.audioSeconds));
-  const speedList = [...fin, ...(y === thisYear ? reading : [])].filter(b => spdOf(b));
+  const speedList = [...fin, ...(live ? reading : [])].filter(b => spdOf(b));
   const dayOf = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d||"")) ? Date.UTC(+d.slice(0,4), +d.slice(5,7) - 1, +d.slice(8,10)) / 864e5 : null;
   const readSpans = fin.map(b => { const a = dayOf(b.startDate), z = dayOf(b.finishDate); return a !== null && z !== null && z >= a ? z - a + 1 : null; }).filter(v => v !== null);
   const avgDays = readSpans.length ? readSpans.reduce((t, v) => t + v, 0) / readSpans.length : 0;
   const avgSpeed = speedList.length ? speedList.reduce((t, b) => t + spdOf(b), 0) / speedList.length : 0;
   const audioNowList = reading.filter(b => isAudio(b) && Number(b.audioPos)), audioNow = audioNowList.length;
-  const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
+  const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (live ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
   const tileList = [
     ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
     ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span></div>`],
@@ -1362,7 +1367,7 @@ function dashHTML(){
     ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
     ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
     ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
-    ["t-spent",   `<div class="tile"><span class="eyebrow">Spent on books</span><span class="v num">${money(spent)}</span><span class="mini">books added in ${y}</span></div>`],
+    ["t-spent",   `<div class="tile"><span class="eyebrow">Spent on books</span><span class="v num">${money(spent)}</span><span class="mini">${all ? "all time" : `books added in ${y}`}</span></div>`],
     ["t-length",  `<div class="tile"><span class="eyebrow">Avg length</span><span class="v num">${fin.length?Math.round(pages/fin.length):"—"} <small>pages</small></span></div>`],
   ].filter(([k]) => show(k));
   // Fill every row with no holes: split tiles into rows of 2-4, each row stretched to the full width
@@ -1370,10 +1375,10 @@ function dashHTML(){
   const rowSizes = Array.from({length:tRows}, (_, r) => Math.floor(tn/tRows) + (r < tn % tRows ? 1 : 0));
   const spans = rowSizes.flatMap(n => Array(n).fill(12 / n)), tcols = 12;
   const spanOf = i => spans[i] || 12;
-  const tiles = tn ? `<section class="tiles" style="--tc:${tcols}" aria-label="${y} at a glance">${tileList.map((t, i) => t[1].replace('<div class="tile"', `<div class="tile${tn % 2 && i === tn - 1 ? " odd-last" : ""}" style="--span:${spanOf(i)}"`)).join("")}</section>` : "";
+  const tiles = tn ? `<section class="tiles" style="--tc:${tcols}" aria-label="${yl} at a glance">${tileList.map((t, i) => t[1].replace('<div class="tile"', `<div class="tile${tn % 2 && i === tn - 1 ? " odd-last" : ""}" style="--span:${spanOf(i)}"`)).join("")}</section>` : "";
 
   const ed = S.shelfEdit, nRows = shelfLayout(y).rows.length;
-  const shelf = `<section class="panel"><div class="panel-h"><h2>The ${y} ${nRows > 1 ? "bookcase" : "shelf"}</h2>${S.canWrite ? `<button class="btn ${ed?"primary":"ghost"}" data-act="shelf-edit">${ed?"Done":"Edit shelves"}</button>` : `<span class="eyebrow">${fin.length} finished · tap a spine</span>`}</div>
+  const shelf = `<section class="panel"><div class="panel-h"><h2>${all ? "The all-time" : `The ${y}`} ${nRows > 1 ? "bookcase" : "shelf"}</h2>${S.canWrite ? `<button class="btn ${ed?"primary":"ghost"}" data-act="shelf-edit">${ed?"Done":"Edit shelves"}</button>` : `<span class="eyebrow">${fin.length} finished · tap a spine</span>`}</div>
     ${ed ? shelfToolsHTML() : ""}
     ${bookcaseHTML(y, fin)}
     ${ed ? itemBarHTML(y) : ""}</section>`;
@@ -1392,17 +1397,20 @@ function dashHTML(){
   </section>`;
 
   // monthly chart
-  const counts = Array(12).fill(0); fin.forEach(b => { const m = Number((b.finishDate||"").slice(5,7)); if(m) counts[m-1]++; });
+  const cYears = all ? Object.keys(byYr).map(Number).sort((a,b) => a-b) : [];
+  const cLabels = all ? cYears.map(String) : MONTHS;
+  const counts = all ? cYears.map(k => byYr[k]) : Array(12).fill(0);
+  if (!all) fin.forEach(b => { const m = Number((b.finishDate||"").slice(5,7)); if(m) counts[m-1]++; });
   const maxV = Math.max(2, ...counts); const step = maxV<=4?1:Math.ceil(maxV/4);
-  const W = show("genres") ? 600 : 1100, H=230, L=30, B=28, T=18, bw=(W-L-10)/12;
+  const W = show("genres") ? 600 : 1100, H=230, L=30, B=28, T=18, bw=(W-L-10)/Math.max(1, cLabels.length);
   const yv = v => H-B - (v/ (Math.ceil(maxV/step)*step)) * (H-B-T);
   let grid=""; for(let v=0; v<=Math.ceil(maxV/step)*step; v+=step) grid += `<line class="grid" x1="${L}" x2="${W-6}" y1="${yv(v)}" y2="${yv(v)}"/><text x="${L-8}" y="${yv(v)+4}" text-anchor="end">${v}</text>`;
-  const nowM = y===thisYear ? new Date().getMonth() : -1;
-  const bars = counts.map((v,i)=>{ const x=L+i*bw+bw*.18, w=bw*.64, top=yv(v);
+  const nowM = all ? cYears.indexOf(thisYear) : y===thisYear ? new Date().getMonth() : -1;
+  const bars = counts.map((v,i)=>{ const w=Math.min(bw*.64, 64), x=L+i*bw+(bw-w)/2, top=yv(v);
     return (v?`<rect class="b${i===nowM?" now":""}" x="${x}" y="${top}" width="${w}" height="${H-B-top}" rx="3"/><text class="val" x="${x+w/2}" y="${top-5}" text-anchor="middle">${v}</text>`:"") +
-      `<text x="${x+w/2}" y="${H-9}" text-anchor="middle">${MONTHS[i]}</text>`; }).join("");
-  const chart = `<section class="panel"><div class="panel-h"><h2>Books finished by month</h2><span class="eyebrow">${y}</span></div>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Books finished per month in ${y}">${grid}${bars}</svg>${(() => { const n = fin.filter(b => !Number(String(b.finishDate||"").slice(5,7))).length; return n ? `<p class="mini" style="margin:6px 0 0">+ ${n} book${n===1?"":"s"} finished sometime in ${y} (no month given)</p>` : ""; })()}</section>`;
+      `<text x="${x+w/2}" y="${H-9}" text-anchor="middle">${cLabels[i]}</text>`; }).join("");
+  const chart = `<section class="panel"><div class="panel-h"><h2>Books finished by ${all ? "year" : "month"}</h2><span class="eyebrow">${yl}</span></div>
+    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Books finished per ${all ? "year" : `month in ${y}`}">${grid}${bars}</svg>${all ? (() => { const n = fin.filter(b => !yr(b.finishDate)).length; return n ? `<p class="mini" style="margin:6px 0 0">+ ${n} finished book${n===1?"":"s"} with no finish date</p>` : ""; })() : ""}${all ? "" : (() => { const n = fin.filter(b => !Number(String(b.finishDate||"").slice(5,7))).length; return n ? `<p class="mini" style="margin:6px 0 0">+ ${n} book${n===1?"":"s"} finished sometime in ${y} (no month given)</p>` : ""; })()}</section>`;
 
   // genres + formats
   const src = fin.length ? fin : [];
@@ -1413,7 +1421,7 @@ function dashHTML(){
   const fm = {}; src.forEach(b => { const f=b.format||"Print"; fm[f]=(fm[f]||0)+1; });
   const fcol = {Print:"var(--accent)", Ebook:"var(--brass)", Audiobook:"var(--rust)"};
   const ftotal = src.length||1;
-  const genres = `<section class="panel"><div class="panel-h"><h2>What you read</h2><span class="eyebrow">${y}</span></div>
+  const genres = `<section class="panel"><div class="panel-h"><h2>What you read</h2><span class="eyebrow">${yl}</span></div>
     ${onlyUnsorted ? `<p class="empty">None of this year's books have a genre yet. Imports don't include one. Use <b>Find covers &amp; details</b> in the Library to fill them in, or add one with Edit.</p>` : ""}
     ${unsorted && !onlyUnsorted ? `<p class="mini" style="margin:-4px 0 10px">${unsorted} book${unsorted===1?"":"s"} without a genre not shown.</p>` : ""}
     ${gl.length || onlyUnsorted ? `${gl.length?`<div class="hbars">${gl.map(([g,n])=>`<div class="hb"><span class="lbl" title="${esc(g)}">${esc(g)}</span><span class="trk"><i style="width:${n/gmax*100}%"></i></span><span class="n num">${n}</span></div>`).join("")}</div>`:""}
@@ -1429,12 +1437,12 @@ function dashHTML(){
     const mm = {}; withMood.forEach(b=>b.moods.forEach(m=>{ m=String(m).trim().toLowerCase(); if(m) mm[m]=(mm[m]||0)+1; }));
     const ml = Object.entries(mm).sort((a,b)=>b[1]-a[1]).slice(0,12); const mmax = ml[0]?.[1]||1;
     const top = ml.slice(0,2).map(x=>x[0]);
-    const moodPanel = `<section class="panel"><div class="panel-h"><h2>How your ${y} reading felt</h2><span class="eyebrow">${withMood.length} book${withMood.length===1?"":"s"} with moods</span></div>
+    const moodPanel = `<section class="panel"><div class="panel-h"><h2>How your ${all ? "" : y + " "}reading felt</h2><span class="eyebrow">${withMood.length} book${withMood.length===1?"":"s"} with moods</span></div>
       ${ml.length?`<p class="mini" style="margin:-4px 0 12px">Mostly <b>${top.map(esc).join("</b> and <b>")}</b>.</p><div class="moods">${ml.map(([m,n])=>`<span class="mood" style="--k:${(n/mmax).toFixed(2)}">${esc(m)}<i class="num">${n}</i></span>`).join("")}</div>`:`<p class="empty">No moods on this year's finished books yet.</p>`}</section>`;
     const pc = {slow:0,medium:0,fast:0}; withPace.forEach(b=>{ const p=String(b.pace).toLowerCase(); if(p in pc) pc[p]++; });
     const pt = Object.values(pc).reduce((a,b)=>a+b,0)||1;
     const pcol = {slow:"var(--accent)",medium:"var(--brass)",fast:"var(--rust)"};
-    const pacePanel = `<section class="panel"><div class="panel-h"><h2>Pace</h2><span class="eyebrow">${y}</span></div>
+    const pacePanel = `<section class="panel"><div class="panel-h"><h2>Pace</h2><span class="eyebrow">${yl}</span></div>
       ${withPace.length?`<div class="split">${PACES.map(p=>pc[p]?`<i style="width:${pc[p]/pt*100}%;background:${pcol[p]}"></i>`:"").join("")}</div>
       <div class="legend">${PACES.map(p=>`<span><b style="background:${pcol[p]}"></b>${p[0].toUpperCase()+p.slice(1)} ${pc[p]}</span>`).join("")}</div>`:`<p class="empty">No pace info on this year's finished books yet.</p>`}</section>`;
     moodHTML = moodPanel; paceHTML = pacePanel;
@@ -1739,7 +1747,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.30.0";
+const APP_VERSION = "1.31.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2511,7 +2519,7 @@ document.addEventListener("submit", async e => {
 });
 
 document.addEventListener("change", async e => {
-  if (e.target.id==="yearSel"){ S.year=Number(e.target.value); S.editingGoal=false; S.shelfEdit=false; S.shelfSel=null; S.shelfTarget=null; render(); }
+  if (e.target.id==="yearSel"){ S.year = e.target.value === "all" ? "all" : Number(e.target.value); S.editingGoal=false; S.shelfEdit=false; S.shelfSel=null; S.shelfTarget=null; render(); }
   if (e.target.dataset && e.target.dataset.dash && S.cm?.type==="dash"){
     const hidden = new Set(S.settings.dashHidden || []); const k = e.target.dataset.dash;
     if (e.target.checked) hidden.delete(k); else hidden.add(k);

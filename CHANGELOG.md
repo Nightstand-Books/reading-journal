@@ -16,6 +16,13 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.31.0 (October 9, 2026)
+- The year menu at the top has an **All time** option.
+- All time shows your total books finished, how many years they span and your biggest year, in place of the yearly goal.
+- Stat tiles, the bookcase, What you read, moods and pace all cover every book you've finished.
+- The chart becomes **Books finished by year**.
+- The all-time bookcase can be arranged on its own with Edit shelves, without changing your yearly shelves.
+
 ## 1.30.0 (October 8, 2026)
 - Setting a book's source to **Bought** automatically checks **Owned**.
 - Books already marked Bought were checked as Owned, except any where you had unchecked Owned yourself.
