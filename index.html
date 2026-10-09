@@ -1337,7 +1337,7 @@ function dashHTML(){
   const bestYr = Object.entries(byYr).sort((a,b) => b[1]-a[1] || b[0]-a[0])[0], nYrs = Object.keys(byYr).length;
   const goalPanel = all ? `<section class="panel"><div class="panel-h"><span class="eyebrow">All-time reading</span></div>
     <div class="goal"><div><div class="big num">${fin.length.toLocaleString()}</div>
-      <div class="pace">book${fin.length===1?"":"s"} finished${nYrs ? ` across ${nYrs} year${nYrs===1?"":"s"}` : ""}.${bestYr && nYrs > 1 ? ` Your biggest year was ${bestYr[0]}, with ${bestYr[1]}.` : ""}</div></div></div></section>`
+      <div class="pace">book${fin.length===1?"":"s"} finished${nYrs ? ` across ${nYrs} year${nYrs===1?"":"s"}` : ""}.${bestYr && nYrs > 1 ? `<br>Your biggest year was ${bestYr[0]}, with ${bestYr[1]}.` : ""}</div></div></div></section>`
   : `<section class="panel"><div class="panel-h"><span class="eyebrow">${y} reading goal</span></div>
     <div class="goal">
       <svg class="ring" width="112" height="112" viewBox="0 0 112 112" role="img" aria-label="${fin.length} of ${goal||"no"} books">
@@ -1747,7 +1747,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.31.0";
+const APP_VERSION = "1.31.1";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show

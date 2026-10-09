@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.31.1 (October 9, 2026)
+- In the All time view, "Your biggest year was…" starts on its own line.
+
 ## 1.31.0 (October 9, 2026)
 - The year menu at the top has an **All time** option.
 - All time shows your total books finished, how many years they span and your biggest year, in place of the yearly goal.
