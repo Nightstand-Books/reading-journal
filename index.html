@@ -543,7 +543,7 @@ const today = () => new Date().toLocaleDateString("en-CA");
 const thisYear = new Date().getFullYear();
 
 const S = { tab:"dash", year:thisYear, books:[], settings:{goals:{}}, loaded:false, db:null, assets:null, canWrite:true, noDb:false,
-  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
+  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", fOwned:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
   sample:null, imp:null, sum:null, challenges:[], cm:null, pendingSlot:null, fChal:"", coverMap:{}, user:null, unsubs:[], ol:null };
 const PACES = ["slow","medium","fast"];
 let shelfDrag = null;
@@ -1431,6 +1431,7 @@ function libHTML(){
       <input class="search" id="q" type="search" placeholder="Search titles, authors, notes" value="${esc(S.q)}" aria-label="Search your library">
       <select class="pill" id="fGenre" aria-label="Genre"><option value="">All genres</option>${genres.map(g=>`<option ${g===S.fGenre?"selected":""}>${esc(g)}</option>`).join("")}</select>
       <select class="pill" id="fFormat" aria-label="Format"><option value="">All formats</option>${FORMATS.map(f=>`<option value="${esc(f)}" ${S.fFormat===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
+      <select class="pill" id="fOwned" aria-label="Owned"><option value="">Owned or not</option><option value="yes" ${S.fOwned==="yes"?"selected":""}>Owned</option><option value="no" ${S.fOwned==="no"?"selected":""}>Not owned</option></select>
       ${tbrShelves().length ? `<select class="pill" id="fTbr" aria-label="TBR shelf"><option value="">Any TBR shelf</option>${tbrShelves().map(x=>`<option value="${esc(x.id)}" ${S.fTbr===x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>` : ""}
       <select class="pill" id="fChal" aria-label="Challenge"><option value="">Any challenge status</option><option value="any" ${S.fChal==="any"?"selected":""}>In a challenge</option><option value="none" ${S.fChal==="none"?"selected":""}>Not in a challenge</option>${[...S.challenges].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(c=>`<option value="c:${esc(c.id)}" ${S.fChal==="c:"+c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
       ${S.canWrite && S.books.some(needsLookup) ? `<button class="btn" data-act="bulk-ol">Find covers &amp; details</button>` : ""}
@@ -1508,7 +1509,7 @@ function renderGrid(){
   if (S.fChal.startsWith("c:") && !S.challenges.some(c=>"c:"+c.id===S.fChal)) S.fChal = "";
   const chalOk = b => !S.fChal || (S.fChal==="any" ? !!inChal[b.id] : S.fChal==="none" ? !inChal[b.id] : (inChal[b.id]||[]).some(x=>"c:"+x.c.id===S.fChal));
   let list = S.books.filter(b =>
-    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
+    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && (!S.fOwned || (S.fOwned==="yes") === !!b.owned) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
     (!q || [b.title,b.author,b.genre,b.series,b.review,b.notes,b.quote,b.summary,(b.moods||[]).join(" "),(b.tags||[]).join(" ")].some(x => String(x||"").toLowerCase().includes(q))));
   const by = {
     added:(a,b)=>(b.dateAdded||"").localeCompare(a.dateAdded||"") || (b.createdAt||0)-(a.createdAt||0),
@@ -1563,6 +1564,7 @@ function renderModal(){
       <div class="mini num">${esc(pr.line)}${pr.left ? " · " + esc(pr.left) : ""}${isAudio(b) && !tot ? ". Enter the audiobook length above to track by time." : ""}</div></div>` : "";
   const quick = S.canWrite && b.status==="tbr" ? `<div class="block quick-row"><button class="btn primary" data-act="start">Start reading today</button>
       <label class="check upnext-check"><input type="checkbox" id="unToggle" ${inUpNext(b.id)?"checked":""}> <span><b>Up next</b><span class="mini" style="display:block">Show it in Up next on the dashboard</span></span></label></div>` : "";
+  const ownBlock = S.canWrite && !S.noDb ? `<div class="block"><label class="check upnext-check"><input type="checkbox" id="ownedToggle" ${b.owned?"checked":""}> <span><b>I own this book</b><span class="mini" style="display:block">Filter by owned books in the Library</span></span></label></div>` : (b.owned ? `<div class="block mini">Owned</div>` : "");
   const tbrBlock = S.canWrite && !S.noDb ? `<div class="block"><div class="eyebrow">TBR shelves</div><div class="tbr-chips">${tbrShelves().map(x => `<label class="tbr-chip"><input type="checkbox" data-tbrtoggle="${esc(x.id)}" ${(x.books||[]).includes(b.id)?"checked":""}> ${esc(x.name)}</label>`).join("")}<button class="btn ghost sm" data-act="tbr-new-for">+ New shelf</button></div></div>` : "";
   sheet.innerHTML = `<div class="sheet-h"><span class="status ${stClass(b.status)}">${esc(stLabel(b.status))}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="detail">
@@ -1575,7 +1577,7 @@ function renderModal(){
       ${b.communityRating?`<div class="community num">Goodreads readers: <b>${Number(b.communityRating).toFixed(2)}</b>${b.communityAsOf?` (as of ${fmtDate(b.communityAsOf)})`:""}</div>`:""}
       ${summaryBlock(b)}
       ${S.canWrite && !b.olKey ? `<div class="block"><button class="btn" data-act="ol-lookup">Find cover &amp; details</button><span class="mini" style="margin-left:10px">Adds a cover, description and rating</span></div>` : ""}
-      ${prog}${quick}${tbrBlock}
+      ${prog}${quick}${ownBlock}${tbrBlock}
       <div class="facts">
         <div><span>Genre</span><span>${esc(b.genre||"—")}</span></div>
         <div><span>Format</span><span>${esc(b.format||"—")}</span></div>
@@ -1690,7 +1692,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.26.0";
+const APP_VERSION = "1.27.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2464,6 +2466,8 @@ document.addEventListener("change", async e => {
   }
   if (e.target.dataset && e.target.dataset.tbrtoggle && S.openId){ const x = tbrShelves().find(z => z.id===e.target.dataset.tbrtoggle); tbrToggle(e.target.dataset.tbrtoggle, S.openId, e.target.checked); toast(e.target.checked ? `Added to ${x?x.name:"shelf"}` : `Removed from ${x?x.name:"shelf"}`); render(); return; }
   if (e.target.dataset && e.target.dataset.tbrbook && S.cm?.type==="tbrpick"){ tbrToggle(S.cm.id, e.target.dataset.tbrbook, e.target.checked); return; }
+  if (e.target.id==="fOwned"){ S.fOwned=e.target.value; renderGrid(); return; }
+  if (e.target.id==="ownedToggle" && S.openId){ const on = e.target.checked; patch(S.openId, {owned: on}); toast(on ? "Marked as owned" : "Marked as not owned"); return; }
   if (e.target.id==="fFormat"){ S.fFormat=e.target.value; renderGrid(); return; }
   if (e.target.id==="fYear"){ S.fYear=e.target.value; renderGrid(); return; }
   if (e.target.id==="fTbr"){ S.fTbr=e.target.value; renderGrid(); return; }

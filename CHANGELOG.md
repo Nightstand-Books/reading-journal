@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.27.0 (October 8, 2026)
+- Each book's page has an **I own this book** checkbox, right on the page without opening Edit book.
+- The Library can filter by Owned or Not owned, together with the other filters.
+
 ## 1.26.0 (October 8, 2026)
 - The Library can filter by format: Print, Ebook or Audiobook. Books without a format count as Print. It works together with the other filters.
 
