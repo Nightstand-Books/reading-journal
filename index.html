@@ -1193,7 +1193,7 @@ function renderModal(){
   const pr = progressOf(b), tot = Number(b.audioSeconds)||0, pos = Number(b.audioPos)||0;
   const audioInputs = isAudio(b) ? (tot
       ? `<span class="mini">I'm at</span><input id="apH" type="number" min="0" class="hm" value="${secH(pos)}" aria-label="Hours listened"><span class="mini">hr</span><input id="apM" type="number" min="0" max="59" class="hm" value="${secM(pos)}" aria-label="Minutes listened"><span class="mini">min</span><button class="btn" data-act="save-audio">Update</button>`
-      : `<span class="mini">Audiobook length</span><input id="alH" type="number" min="0" class="hm" aria-label="Length hours"><span class="mini">hr</span><input id="alM" type="number" min="0" max="59" class="hm" aria-label="Length minutes"><span class="mini">min</span><button class="btn" data-act="save-audio-len">Save length</button>`) : "";
+      : `<span class="mini">Audiobook length</span><input id="alH" type="number" min="0" class="hm" aria-label="Length hours"><span class="mini">hr</span><input id="alM" type="number" min="0" max="59" class="hm" aria-label="Length minutes"><span class="mini">min</span><button class="btn" data-act="save-audio-len">Save length</button>${hcProxy() ? `<button class="btn ghost" data-act="audio-lookup">Get it from Hardcover</button>` : ""}`) : "";
   const prog = b.status==="reading" ? `<div class="block"><div class="eyebrow">${isAudio(b) ? "Listening progress" : "Progress"}</div><div class="bar" style="height:8px"><i style="width:${pr.pc}%"></i></div>
       <div class="prog-row">${S.canWrite ? (isAudio(b) ? audioInputs : `<label for="curPage" class="mini">I'm on page</label><input id="curPage" type="number" min="0" ${p?`max="${p}"`:""} value="${c||""}"><button class="btn" data-act="save-page">Update</button>`) + `<button class="btn primary" data-act="finish">Mark finished</button>` : `<span class="mini num">${esc(pr.line)}</span>`}</div>
       <div class="mini num">${esc(pr.line)}${pr.left ? " · " + esc(pr.left) : ""}${isAudio(b) && !tot ? ". Enter the audiobook length above to track by time." : ""}</div></div>` : "";
@@ -1311,7 +1311,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-l";
+const APP_VERSION = "2026.10.08-m";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1378,7 +1378,7 @@ async function olSearch(q, signal){
   const x = new Error("all"); x.reason = problems.join("; "); throw x;
 }
 // A book still needs a lookup if it has never been matched, or (with Hardcover connected) it was matched elsewhere and not yet checked on Hardcover.
-const needsAudioLen = b => isAudio(b) && !Number(b.audioSeconds) && !b.audioChecked && !!hcProxy();
+const needsAudioLen = b => isAudio(b) && !Number(b.audioSeconds) && !b.audioLookup && !!hcProxy();
 function needsLookup(b){ if (!b.title) return false; if (!b.olKey) return !b.olChecked; return (!!hcProxy() && !String(b.olKey).startsWith("hc:") && !b.hcChecked) || needsAudioLen(b); }
 const normT = t => String(t||"").toLowerCase().replace(/\(.*?\)/g,"").split(":")[0].replace(/[^a-z0-9]/g,"");
 async function hcFind(title, author){ const r = await hcSearch(`${title} ${author||""}`.trim(), null, 3); return r.find(d => normT(d.title).slice(0,12) === normT(title).slice(0,12)) || null; }
@@ -1488,7 +1488,7 @@ async function runBulkOL(){
       const cur = S.books.find(x => x.id === b.id) || b; const {id, ...rest} = cur;
       if (cur.olKey && (String(cur.olKey).startsWith("hc:") || cur.hcChecked)){ // only missing the audiobook length
         const d = await hcFind(String(cur.title).replace(/\(.*?\)/g,"").split(":")[0].trim(), cur.author);
-        await saveBook(id, {...rest, audioChecked: today(), ...(d && d._audio ? {audioSeconds: d._audio} : {})}); if (d && d._audio){ me.found++; me.by.Hardcover = (me.by.Hardcover||0) + 1; } else me.missed++;
+        await saveBook(id, {...rest, audioLookup: today(), ...(d && d._audio ? {audioSeconds: d._audio} : {})}); if (d && d._audio){ me.found++; me.by.Hardcover = (me.by.Hardcover||0) + 1; } else me.missed++;
         me.done++; if (S.cm === me) renderModal(); await new Promise(r => setTimeout(r, 350)); continue;
       }
       const upgrade = !!cur.olKey; // already matched elsewhere: only ask Hardcover
@@ -1497,7 +1497,7 @@ async function runBulkOL(){
         const work = (!cur.summary || !cur.genre) ? await olWork(d.key) : null;
         const p = olPatch(d, work, cur, false);
         if (upgrade && d.cover_url && !cur.coverId){ p.coverUrl = d.cover_url; p.olCover = ""; }
-        if (isAudio(cur)) p.audioChecked = today();
+        if (isAudio(cur)) p.audioLookup = today();
         await saveBook(id, {...rest, ...p}); me.found++; const src = d._src || "Open Library"; me.by[src] = (me.by[src]||0) + 1;
       }
       else { await saveBook(id, {...rest, ...(upgrade ? {hcChecked: today()} : {olChecked: today()})}); me.missed++; }
@@ -1963,6 +1963,12 @@ document.addEventListener("click", async e => {
     render(); return;
   }
   if (act==="save-audio"){ const b=S.books.find(x=>x.id===S.openId); const v = Math.min(Number(b.audioSeconds)||Infinity, hmToSec($("#apH").value, $("#apM").value)); await patch(S.openId,{audioPos:v}); toast("Progress saved"); return; }
+  if (act==="audio-lookup"){ const b=S.books.find(x=>x.id===S.openId); if (!b) return; el.disabled = true; el.textContent = "Checking Hardcover…";
+    try { const d = await hcFind(String(b.title).replace(/\(.*?\)/g,"").split(":")[0].trim(), b.author);
+      if (d && d._audio){ await patch(S.openId,{audioSeconds:d._audio, audioLookup:today()}); toast(`Found it: ${fmtDur(d._audio)}`); }
+      else { await patch(S.openId,{audioLookup:today()}); toast(d ? "Hardcover doesn't list a length for this one. Type it in instead." : "Couldn't find this book on Hardcover. Type the length in instead."); el.disabled = false; el.textContent = "Get it from Hardcover"; } }
+    catch(e){ toast("Hardcover didn't answer. Try again in a moment."); el.disabled = false; el.textContent = "Get it from Hardcover"; }
+    return; }
   if (act==="save-audio-len"){ const v = hmToSec($("#alH").value, $("#alM").value); if (!v){ $("#alH").focus(); return; } await patch(S.openId,{audioSeconds:v}); toast("Length saved"); return; }
   if (act==="save-page"){ const v=Number($("#curPage").value)||0; await patch(S.openId,{currentPage:v}); toast("Progress saved"); return; }
   if (act==="finish"){ const b=S.books.find(x=>x.id===S.openId); await patch(S.openId,{status:"finished",finishDate:today(),currentPage:b.pages||b.currentPage||"", ...(b.audioSeconds ? {audioPos:b.audioSeconds} : {})}); toast("Finished! It's on your shelf."); return; }
