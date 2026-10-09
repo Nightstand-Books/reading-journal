@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.28.2 (October 8, 2026)
+- The **I own this book** switch sits right next to its label instead of far off to the right.
+
 ## 1.28.1 (October 8, 2026)
 - Fixed: saving changes to a book (or anything else done while a book is open) no longer sends you back to the top of the Library. Closing the book returns you to exactly where you were.
 - The page behind a book's popup stays still while the popup is open.
