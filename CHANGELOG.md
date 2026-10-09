@@ -16,6 +16,12 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.22.0 (October 8, 2026)
+- The Library has a cover size slider above the books. Smaller covers fit more books on screen, and larger ones show more detail.
+- On a phone, pinch the covers with two fingers to resize them. On a laptop, pinch the trackpad.
+- At small sizes, the author and status labels hide so the covers stay tidy.
+- Your size is remembered separately on each device.
+
 ## 1.21.0 (October 8, 2026)
 - The spine editor shows the book's cover. Tap **Pick spine color** or **Pick text color**, then tap anywhere on the cover to use that color.
 - With the cover on screen, the eyedropper in the color boxes can sample it too.
