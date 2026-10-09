@@ -87,6 +87,9 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .dc-group{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
 .tile{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .tile .v{font-family:var(--f-display);font-size:28px;line-height:1.1}
+.ctiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0 16px}
+.ctiles .tile{padding:10px 14px}.ctiles .tile .v{font-size:22px}
+@media (max-width:520px){.ctiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ctiles .tile:last-child:nth-child(odd){grid-column:1 / -1}}
 .tile .v small{font-family:var(--f-body);font-size:13px;color:var(--muted)}
 .tile .stars{color:var(--brass);letter-spacing:1px;font-size:14px}
 
@@ -1777,7 +1780,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.33.0";
+const APP_VERSION = "1.34.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2196,6 +2199,29 @@ function chalStats(c){
   slots.forEach(s => { const b = s.bookId && S.books.find(x=>x.id===s.bookId); if(!b) return; filled++; if (b.status==="finished") done++; else if (b.status==="reading") going++; });
   return {total:slots.length, done, going, filled};
 }
+/* reading totals for the books in a challenge's spots (each book counted once) */
+function chalTilesHTML(c){
+  const seen = new Set(), books = (c.slots||[]).map(s => s.bookId && S.books.find(x => x.id === s.bookId)).filter(b => b && !seen.has(b.id) && seen.add(b.id));
+  if (!books.length) return "";
+  let pRead = 0, pLeft = 0, sHeard = 0, sLeft = 0, noPages = 0, noLen = 0, hasPrint = false, hasAudio = false;
+  books.forEach(b => {
+    const fin = b.status === "finished";
+    if (isAudio(b)){ hasAudio = true; const tot = Number(b.audioSeconds) || 0, pos = fin ? (Number(b.audioPos) || tot) : Math.min(tot || Infinity, Number(b.audioPos) || 0);
+      sHeard += pos; if (!fin){ if (tot) sLeft += Math.max(0, tot - pos); else noLen++; } }
+    else { hasPrint = true; const tot = Number(b.pages) || 0, cur = fin ? (Number(b.currentPage) || tot) : Math.min(tot || Infinity, Number(b.currentPage) || 0);
+      pRead += cur; if (!fin){ if (tot) pLeft += Math.max(0, tot - cur); else noPages++; } }
+  });
+  const hrs = sec => sec ? `${(Math.round(sec / 360) / 10).toLocaleString()} <small>hr</small>` : `0 <small>hr</small>`;
+  const tile = (label, val, note) => `<div class="tile"><span class="eyebrow">${label}</span><span class="v num">${val}</span>${note ? `<span class="mini">${note}</span>` : ""}</div>`;
+  const miss = (n, what) => n ? `${n} book${n===1?"":"s"} missing ${what}` : "";
+  const t = [];
+  if (hasPrint || !hasAudio){ t.push(tile("Pages read", pRead.toLocaleString())); t.push(tile("Pages to go", pLeft.toLocaleString(), miss(noPages, "a page count"))); }
+  if (hasAudio){ t.push(tile("Hours listened", hrs(sHeard))); t.push(tile("Hours to go", hrs(sLeft), miss(noLen, "a length"))); }
+  if (c.endDate){ const end = Date.UTC(+c.endDate.slice(0,4), +c.endDate.slice(5,7) - 1, +c.endDate.slice(8,10)), now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()), d = Math.round((end - today) / 864e5);
+    const st = chalStats(c), toGo = st.total - st.done;
+    t.push(tile(d >= 0 ? "Days left" : "Ended", d >= 0 ? d.toLocaleString() : `${(-d).toLocaleString()} <small>days ago</small>`, d >= 0 && toGo ? `${toGo} spot${toGo===1?"":"s"} to go` : "")); }
+  return `<div class="ctiles">${t.join("")}</div>`;
+}
 function slotHTML(c, s, i){
   const b = s.bookId && S.books.find(x=>x.id===s.bookId);
   const mark = b ? (b.status==="finished" ? `<span class="slot-mark done" title="Finished">✓</span>` : b.status==="reading" ? `<span class="slot-mark going" title="Reading">◐</span>` : "") : "";
@@ -2222,6 +2248,7 @@ function chalHTML(){
           ${S.canWrite?`<button class="btn ghost" data-act="chal-edit" data-cid="${esc(c.id)}">Edit</button>`:""}</div>
         <div class="chal-prog"><div class="bar" style="height:8px;flex:1"><i style="width:${pct}%;background:var(--accent)"></i></div>
           <span class="num"><b>${st.done}</b> of ${st.total} finished${st.going?` · ${st.going} reading`:""}${st.filled-st.done-st.going>0?` · ${st.filled-st.done-st.going} picked`:""}${st.done===st.total&&st.total?" · Complete!":""}</span></div>
+        ${chalTilesHTML(c)}
         <div class="cgrid">${(c.slots||[]).map((s,i)=>slotHTML(c,s,i)).join("")}</div>
       </section>`; }).join("");
 }

@@ -16,6 +16,11 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.34.0 (October 9, 2026)
+- Each challenge has stat tiles under its progress bar: **Pages read** and **Pages to go**, plus **Hours listened** and **Hours to go** when it has audiobooks.
+- Challenges with an end date also show **Days left** and how many spots are still to go.
+- Totals count each book once, even if it fills more than one spot. A note shows when a book is missing a page count or audiobook length, since those can't be counted toward what's left.
+
 ## 1.33.0 (October 9, 2026)
 - The Library has a **Moods** button that lists every mood on your books, with how many books have each.
 - Check as many moods as you like. Only books tagged with **all** of the checked moods are shown, so "dark" plus "emotional" finds books that are both.
