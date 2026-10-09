@@ -255,6 +255,8 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .status{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
 .s-reading{color:var(--brass)} .s-finished{color:var(--accent)} .s-tbr{color:var(--muted)} .s-dnf{color:var(--rust)} .s-custom{color:var(--ink)}
 .cat-list{display:flex;flex-direction:column;gap:6px}
+.linkish.danger-link{color:var(--rust);font-weight:600;margin-left:6px}
+.book-foot .grp{align-items:center;flex-wrap:wrap}
 .tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{white-space:nowrap}
 .tbr-shelf{margin-bottom:16px}
 .t-short{display:none}
@@ -1391,6 +1393,7 @@ function renderModal(){
         <div><span>Genre</span><span>${esc(b.genre||"—")}</span></div>
         <div><span>Format</span><span>${esc(b.format||"—")}</span></div>
         <div><span>Pages</span><span class="num">${p||"—"}</span></div>
+        ${isAudio(b) && (b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos)) ? `<div><span>Hours listened</span><span class="num">${fmtDur(b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos))}</span></div>` : ""}
         ${b.audioSeconds ? `<div><span>Audiobook length</span><span class="num">${fmtDur(b.audioSeconds)}</span>${b.audioEdition?`<span class="mini">${esc(b.audioEdition)}</span>`:""}${S.canWrite && hcProxy() && isAudio(b) ? `<button class="linkish" data-act="aed" style="align-self:flex-start">Change edition</button>` : ""}</div>` : ""}
         <div><span>Source</span><span>${esc(b.source||"—")}</span></div>
         <div><span>Started</span><span>${fmtDate(b.startDate)}</span></div>
@@ -1407,8 +1410,10 @@ function renderModal(){
       ${inChallenges(b.id).length?`<div class="block"><div class="eyebrow">In your challenges</div><div class="chal-chips">${inChallenges(b.id).map(({c,i,s})=>`<button class="chal-chip" data-act="goto-chal"><b>${esc(c.name)}</b> · spot ${i+1}: ${esc(s.prompt||"No prompt")}</button>`).join("")}</div></div>`:""}
       ${b.tags&&b.tags.length?`<div class="block"><div class="eyebrow">Shelves &amp; tags</div><div class="tagrow">${b.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div>`:""}
     </div></div>
-    ${S.canWrite?`<div class="foot"><div class="grp"><button class="btn primary" data-act="edit">Edit book</button></div>
-      <div class="grp"><button class="btn danger ${S.armedDelete?"armed":""}" data-act="delete">${S.armedDelete?"Yes, delete this book":"Delete"}</button>${S.armedDelete?`<button class="btn ghost" data-act="disarm">Keep it</button>`:""}</div></div>`:""}
+    ${S.canWrite?`<div class="foot book-foot"><div class="grp">${S.armedDelete
+        ? `<span class="mini">Delete this book for good?</span><button class="btn danger armed" data-act="delete">Yes, delete it</button><button class="btn ghost" data-act="disarm">Keep it</button>`
+        : `<button class="btn" data-act="edit">Edit book</button><button class="linkish danger-link" data-act="delete">Delete book</button>`}</div>
+      ${S.armedDelete ? "" : `<button class="btn primary" data-act="close">Done</button>`}</div>`:""}
     ${S.err?`<div class="err">${esc(S.err)}</div>`:""}
   </div>`;
 }
@@ -1440,7 +1445,7 @@ function formHTML(){
       <div class="f"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">—</option>${opt(SOURCES,d.source)}</select></div>
       <div class="f"><label for="f-pages">Total pages</label><input id="f-pages" name="pages" type="number" min="0" value="${esc(d.pages)}"></div>
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
-      <div class="f"><label>Listened so far</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.audioPos)}" aria-label="Minutes listened"> min</span></div>` : ""}
+      <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>` : ""}
       <div class="f"><label for="f-cur">Current page</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.currentPage)}"></div>
       <div class="f"><label for="f-start">Date started</label><input id="f-start" name="startDate" type="date" value="${esc(d.startDate)}"></div>
       <div class="f"><label for="f-finish">Date finished</label><input id="f-finish" name="finishDate" type="date" value="${esc(d.finishDate)}"></div>
@@ -1489,7 +1494,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-r";
+const APP_VERSION = "2026.10.08-t";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2074,7 +2079,7 @@ document.addEventListener("click", async e => {
   if (act==="close-aed"){ const id=S.cm?.id; S.cm=null; S.openId=id||null; renderModal(); return; }
   if (act==="aed-pick"){ const m=S.cm, o=m && m.opts[Number(el.dataset.i)]; if(!o) return; const b=S.books.find(x=>x.id===m.id); if(!b) return;
     S.cm=null; S.openId=b.id; const pos = Number(b.audioPos)||0;
-    await patch(b.id, {audioSeconds:o.seconds, audioEdition:o.tag, audioLookup:today(), ...(pos > o.seconds ? {audioPos:o.seconds} : {})}); toast(`Using ${o.label}: ${fmtDur(o.seconds)}`); renderModal(); return; }
+    await patch(b.id, {audioSeconds:o.seconds, audioEdition:o.tag, audioLookup:today(), ...(b.status==="finished" ? {audioPos:o.seconds} : pos > o.seconds ? {audioPos:o.seconds} : {})}); toast(`Using ${o.label}: ${fmtDur(o.seconds)}`); renderModal(); return; }
   if (act==="dash-custom"){ S.openId=null; S.cm={type:"dash"}; renderModal(); return; }
   if (act==="dash-showall"){ saveDashHidden([]); renderModal(); return; }
   if (act==="look-theme"){ saveLook({theme: el.dataset.k}); return; }
@@ -2208,6 +2213,7 @@ document.addEventListener("submit", async e => {
   e.preventDefault(); readForm();
   if (!S.draft.title.trim()){ S.err="Give the book a title."; renderModal(); return; }
   const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
+  if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);
@@ -2231,6 +2237,7 @@ document.addEventListener("change", async e => {
   if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
   if (e.target.dataset && e.target.dataset.st && S.cm?.type==="cats"){ const k = e.target.dataset.st, v = e.target.value.trim(); const n = {...(S.settings.statusNames||{})}; if (!v || v === STATUS[k]) delete n[k]; else n[k] = v; saveSettings({statusNames: n}); render(); renderModal(); return; }
   if (e.target.dataset && e.target.dataset.cstI !== undefined && S.cm?.type==="cats"){ const v = e.target.value.trim(), list = customStatuses().map(x => ({...x})), i = Number(e.target.dataset.cstI); if (v && list[i]){ list[i].name = v; saveSettings({statuses: list}); render(); } renderModal(); return; }
+  if (e.target.id==="f-status" && S.editing && $("#f-format")?.value==="Audiobook"){ readForm(); if (S.draft.status==="finished" && Number(S.draft.audioSeconds)) S.draft.audioPos = Number(S.draft.audioSeconds); renderModal(); $("#f-status")?.focus(); return; }
   if (e.target.id==="f-format" && S.editing){ readForm(); renderModal(); $("#f-format")?.focus(); }
   if (e.target.id==="unToggle" && S.openId){
     const id = S.openId, ids = (S.settings.upNext || []).filter(x => x !== id);
