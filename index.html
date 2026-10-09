@@ -1739,7 +1739,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.29.0";
+const APP_VERSION = "1.30.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2495,6 +2495,7 @@ document.addEventListener("submit", async e => {
   if (!S.draft.title.trim()){ S.err="Give the book a title."; renderModal(); return; }
   const data = clean(S.draft); delete data.example; rememberGenre(data.genre); rememberSource(data.source);
   if (data.source !== "Bought") data.store = ""; else rememberStore(data.store);
+  { const prev = S.openId !== "new" && S.books.find(x => x.id === S.openId); if (data.source === "Bought" && (!prev || prev.source !== "Bought")) data.owned = true; }   // buying a book means you own it
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
   { const sp = Number(data.audioSpeed), set = data.audioSpeedSet === "1" || data.audioSpeedSet === 1; delete data.audioSpeedSet;
@@ -2665,6 +2666,8 @@ window.NSApp = {
     if (ctx.user.photo){ ab.innerHTML = `<img src="${esc(ctx.user.photo)}" alt="" referrerpolicy="no-referrer">`; }
     S.unsubs.push(S.db.collection("books").onSnapshot(snap => {
       S.books = snap.docs.map(d => ({id:d.id, ...d.data()})); S.loaded = true;
+      if (S.canWrite && !S.ownedFixed){ S.ownedFixed = true;   // one time: books already marked Bought count as owned, unless owned was turned off by hand
+        S.books.filter(b => b.source === "Bought" && b.owned === undefined).forEach(b => { const {id, ...rest} = b; saveBook(id, {...rest, owned: true}).catch(() => {}); }); }
       if (S.editing) readForm();
       if (S.cm?.type==="form") readChal();
       if (S.cm?.type==="bulk" || S.cm?.type==="account"){ paintView(); return; }

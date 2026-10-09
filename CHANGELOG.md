@@ -16,6 +16,11 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.30.0 (October 8, 2026)
+- Setting a book's source to **Bought** automatically checks **Owned**.
+- Books already marked Bought were checked as Owned, except any where you had unchecked Owned yourself.
+- If you uncheck Owned later (say you gave the book away), editing the book won't check it again unless you change the source to Bought again.
+
 ## 1.29.0 (October 8, 2026)
 - The Source menu is in A–Z order, and sources you add slot into place alphabetically.
 - When a book's source is **Bought**, a **Store** menu appears: Amazon, Barnes & Noble, Books-A-Million, Bookshop.org, Costco, Target, Walmart, Indie bookstore, Used bookstore, or **Somewhere else…** to type your own. Stores you type in are remembered.
