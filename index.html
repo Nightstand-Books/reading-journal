@@ -427,7 +427,16 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .mood i{font-style:normal;font-size:12px;color:var(--muted)}
 button.mood{font:inherit;font-size:calc(13px + var(--k)*5px);color:var(--ink);cursor:pointer;transition:transform .12s, box-shadow .12s}
 button.mood:hover{transform:translateY(-1px);box-shadow:0 4px 10px -6px rgba(0,0,0,.35)}
-.fmood{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:5px 8px 5px 12px;font-size:13.5px;background:color-mix(in srgb,var(--brass) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--brass) 45%,transparent);margin:0 0 14px}
+.fmoods{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+.fmood{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:5px 8px 5px 12px;font-size:13.5px;background:color-mix(in srgb,var(--brass) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--brass) 45%,transparent)}
+button.pill{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;cursor:pointer;color:var(--ink)}
+.mbtn.on{border-color:color-mix(in srgb,var(--brass) 60%,transparent);background:color-mix(in srgb,var(--brass) 14%,var(--surface))}
+.mpop{width:min(260px, calc(100vw - 16px));left:0;right:auto}
+.mpop-list{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;margin:0 -6px}
+.mpick{display:flex;align-items:center;gap:10px;padding:6px;border-radius:8px;cursor:pointer;font-size:14px}
+.mpick:hover{background:var(--sunk)}
+.mpick input{margin:0;accent-color:var(--brass);width:16px;height:16px}
+.mpick span{flex:1}.mpick i{font-style:normal;font-size:12px;color:var(--muted)}
 .fmood button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px}
 /* challenges */
 .chal-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
@@ -562,7 +571,7 @@ const today = () => new Date().toLocaleDateString("en-CA");
 const thisYear = new Date().getFullYear();
 
 const S = { tab:"dash", year:thisYear, books:[], settings:{goals:{}}, loaded:false, db:null, assets:null, canWrite:true, noDb:false,
-  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", fOwned:"", fMood:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
+  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", fOwned:"", fMoods:[], sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
   sample:null, imp:null, sum:null, challenges:[], cm:null, pendingSlot:null, fChal:"", coverMap:{}, user:null, unsubs:[], ol:null };
 const PACES = ["slow","medium","fast"];
 let shelfDrag = null;
@@ -1474,6 +1483,21 @@ function yearOk(b){
   const y = yr(b.finishDate);
   return S.fYear === "this" ? y === new Date().getFullYear() : S.fYear === "none" ? !y : y === Number(S.fYear);
 }
+function keepOnScreen(el){ el.style.transform = ""; const r = el.getBoundingClientRect(); let dx = 0;
+  if (r.right > innerWidth - 8) dx = innerWidth - 8 - r.right; if (r.left + dx < 8) dx = 8 - r.left; if (dx) el.style.transform = `translateX(${Math.round(dx)}px)`; }
+const normMood = m => String(m).trim().toLowerCase();
+function moodCounts(){ const c = {}; S.books.forEach(b => (Array.isArray(b.moods) ? b.moods : []).forEach(m => { const k = normMood(m); if (k) c[k] = (c[k]||0) + 1; })); return c; }
+function moodBtnLabel(){ const n = S.fMoods.length; return n ? `Moods (${n})` : "Moods"; }
+function moodPopHTML(){
+  const c = moodCounts(), list = Object.entries(c).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+  if (!list.length) return `<p class="mini" style="margin:0">No moods yet. Moods come from Hardcover and StoryGraph imports.</p>`;
+  return `<p class="mini" style="margin:0 0 8px">Pick one or more. Books must have every mood you pick.</p><div class="mpop-list">${list.map(([m,n]) => `<label class="mpick"><input type="checkbox" data-moodpick="${esc(m)}" ${S.fMoods.includes(m)?"checked":""}><span>${esc(m)}</span><i class="num">${n}</i></label>`).join("")}</div>
+    ${S.fMoods.length ? `<button class="linkish" data-act="mood-clear" style="margin-top:8px">Clear moods</button>` : ""}`;
+}
+function moodPillsHTML(){
+  return S.fMoods.length ? `<div class="fmoods">${S.fMoods.map(m => `<span class="fmood">${esc(m)}<button data-act="mood-remove" data-m="${esc(m)}" aria-label="Remove ${esc(m)}" title="Remove">×</button></span>`).join("")}${S.fMoods.length > 1 ? `<button class="linkish" data-act="mood-clear">Clear all</button>` : ""}</div>` : "";
+}
+function refreshMoodUI(){ const p = $("#moodPills"); if (p) p.innerHTML = moodPillsHTML(); const b = $(".mbtn"); if (b){ b.textContent = moodBtnLabel(); b.classList.toggle("on", S.fMoods.length > 0); } renderGrid(); }
 function libHTML(){
   const genres = [...new Set(S.books.map(b=>b.genre).filter(Boolean))].sort();
   const chip = (v,l) => `<button class="chip" data-act="fstatus" data-v="${v}" aria-pressed="${S.fStatus===v}">${l}</button>`;
@@ -1481,6 +1505,7 @@ function libHTML(){
       <input class="search" id="q" type="search" placeholder="Search titles, authors, notes" value="${esc(S.q)}" aria-label="Search your library">
       <select class="pill" id="fGenre" aria-label="Genre"><option value="">All genres</option>${genres.map(g=>`<option ${g===S.fGenre?"selected":""}>${esc(g)}</option>`).join("")}</select>
       <select class="pill" id="fFormat" aria-label="Format"><option value="">All formats</option>${FORMATS.map(f=>`<option value="${esc(f)}" ${S.fFormat===f?"selected":""}>${esc(f)}</option>`).join("")}</select>
+      <span class="gwrap mwrap"><button class="pill mbtn${S.fMoods.length ? " on" : ""}" data-act="mood-menu" aria-expanded="false">${moodBtnLabel()}</button><div class="gpop mpop" id="mpop" hidden></div></span>
       <select class="pill" id="fOwned" aria-label="Owned"><option value="">Owned or not</option><option value="yes" ${S.fOwned==="yes"?"selected":""}>Owned</option><option value="no" ${S.fOwned==="no"?"selected":""}>Not owned</option></select>
       ${tbrShelves().length ? `<select class="pill" id="fTbr" aria-label="TBR shelf"><option value="">Any TBR shelf</option>${tbrShelves().map(x=>`<option value="${esc(x.id)}" ${S.fTbr===x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>` : ""}
       <select class="pill" id="fChal" aria-label="Challenge"><option value="">Any challenge status</option><option value="any" ${S.fChal==="any"?"selected":""}>In a challenge</option><option value="none" ${S.fChal==="none"?"selected":""}>Not in a challenge</option>${[...S.challenges].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(c=>`<option value="c:${esc(c.id)}" ${S.fChal==="c:"+c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
@@ -1494,7 +1519,7 @@ function libHTML(){
       </select>
     </div>
     <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${allStatuses().map(([k,l]) => chip(k, esc(l))).join("")}<span id="fYearWrap">${fYearHTML()}</span></div>
-    ${S.fMood ? `<div class="fmood">Mood: <b>${esc(S.fMood)}</b><button data-act="mood-clear" aria-label="Clear mood filter" title="Clear">×</button></div>` : ""}
+    <div id="moodPills">${moodPillsHTML()}</div>
     <div id="grid"></div>`;
 }
 
@@ -1560,7 +1585,7 @@ function renderGrid(){
   if (S.fChal.startsWith("c:") && !S.challenges.some(c=>"c:"+c.id===S.fChal)) S.fChal = "";
   const chalOk = b => !S.fChal || (S.fChal==="any" ? !!inChal[b.id] : S.fChal==="none" ? !inChal[b.id] : (inChal[b.id]||[]).some(x=>"c:"+x.c.id===S.fChal));
   let list = S.books.filter(b =>
-    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && (!S.fOwned || (S.fOwned==="yes") === !!b.owned) && (!S.fMood || (Array.isArray(b.moods) && b.moods.some(m => String(m).trim().toLowerCase() === S.fMood))) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
+    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && (!S.fOwned || (S.fOwned==="yes") === !!b.owned) && (!S.fMoods.length || (Array.isArray(b.moods) && S.fMoods.every(f => b.moods.some(m => normMood(m) === f)))) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
     (!q || [b.title,b.author,b.genre,b.series,b.review,b.notes,b.quote,b.summary,(b.moods||[]).join(" "),(b.tags||[]).join(" ")].some(x => String(x||"").toLowerCase().includes(q))));
   const by = {
     added:(a,b)=>(b.dateAdded||"").localeCompare(a.dateAdded||"") || (b.createdAt||0)-(a.createdAt||0),
@@ -1752,7 +1777,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.32.0";
+const APP_VERSION = "1.33.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2332,7 +2357,9 @@ async function sampleCover(e){
   }
 }
 document.addEventListener("click", e => { if (e.target.id === "spCover") sampleCover(e); });
-document.addEventListener("click", e => { const p = $("#gpop"); if (p && !p.hidden && !e.target.closest(".gwrap")) { p.hidden = true; $(".gbtn")?.setAttribute("aria-expanded","false"); } });
+document.addEventListener("click", e => {
+  const p = $("#gpop"); if (p && !p.hidden && !e.target.closest(".gwrap:not(.mwrap)")) { p.hidden = true; $(".gbtn")?.setAttribute("aria-expanded","false"); }
+  const m = $("#mpop"); if (m && !m.hidden && !e.target.closest(".mwrap") && !e.target.closest("[data-act=mood-remove],[data-act=mood-clear]")) { m.hidden = true; $(".mbtn")?.setAttribute("aria-expanded","false"); } });
 document.addEventListener("click", async e => {
   if (nsSuppressClick && e.target.closest(".reading-item")){ nsSuppressClick = false; e.preventDefault(); return; }
   const el = e.target.closest("[data-act]"); if(!el) return;
@@ -2352,14 +2379,17 @@ document.addEventListener("click", async e => {
   if (act==="sp-pick"){ const m=S.cm; if (!m || m.type!=="spine") return; m.pick = m.pick===el.dataset.k ? null : el.dataset.k;
     $(".sp-cover")?.classList.toggle("picking", !!m.pick); document.querySelectorAll('[data-act="sp-pick"]').forEach(x => x.setAttribute("aria-pressed", String(x.dataset.k===m.pick)));
     const h=$("#spPickHint"); if (h) h.textContent = m.pick ? `Tap anywhere on the cover to use that color for the ${m.pick==="color" ? "spine" : "text"}.` : "Choose what to color, then tap the cover. The color boxes' eyedropper can also sample it."; return; }
-  if (act==="grid-size"){ const p=$("#gpop"); if (!p) return; p.hidden = !p.hidden; el.setAttribute("aria-expanded", String(!p.hidden)); if (!p.hidden){ setGridCols(gridCols(), false); p.style.left = ""; p.style.right = ""; const r = p.getBoundingClientRect(); if (r.left < 8){ p.style.right = "auto"; p.style.left = "0"; } } return; }
+  if (act==="grid-size"){ const p=$("#gpop"); if (!p) return; p.hidden = !p.hidden; el.setAttribute("aria-expanded", String(!p.hidden)); if (!p.hidden){ setGridCols(gridCols(), false); keepOnScreen(p); } return; }
   if (act==="grid-more" || act==="grid-fewer"){ setGridCols(gridCols() + (act==="grid-more" ? 1 : -1), true); return; }
   if (act==="spd-step"){ const i=$("#f-speed"); if (!i) return; const v = Number(i.value) || 1, d = Number(el.dataset.d);
     let n = d > 0 ? Math.floor(v * 4 + 1e-9) / 4 + .25 : Math.ceil(v * 4 - 1e-9) / 4 - .25; n = Math.max(.5, Math.min(4, n));
     i.value = String(n); const f = i.form.elements.audioSpeedSet; if (f) f.value = "1"; S.dirty = true; return; }
-  if (act==="mood-go"){ S.fMood = el.dataset.m; S.fStatus = "finished"; S.fYear = S.year === "all" ? "all" : (S.year === new Date().getFullYear() ? "this" : S.year);
+  if (act==="mood-go"){ S.fMoods = [normMood(el.dataset.m)]; S.fStatus = "finished"; S.fYear = S.year === "all" ? "all" : (S.year === new Date().getFullYear() ? "this" : S.year);
     S.q = ""; S.fGenre = ""; S.fFormat = ""; S.fOwned = ""; S.fTbr = ""; S.fChal = ""; S.tab = "lib"; render(); window.scrollTo(0, 0); return; }
-  if (act==="mood-clear"){ S.fMood = ""; render(); return; }
+  if (act==="mood-clear"){ S.fMoods = []; refreshMoodUI(); const mp = $("#mpop"); if (mp && !mp.hidden) mp.innerHTML = moodPopHTML(); return; }
+  if (act==="mood-remove"){ S.fMoods = S.fMoods.filter(m => m !== el.dataset.m); refreshMoodUI(); const mp = $("#mpop"); if (mp && !mp.hidden) mp.innerHTML = moodPopHTML(); return; }
+  if (act==="mood-menu"){ const mp = $("#mpop"); if (!mp) return; mp.hidden = !mp.hidden; el.setAttribute("aria-expanded", String(!mp.hidden));
+    if (!mp.hidden){ mp.innerHTML = moodPopHTML(); keepOnScreen(mp); } return; }
   if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
   if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
   if (act==="store-del"){ const l = [...storeList()]; l.splice(Number(el.dataset.i), 1); saveSettings({stores: l}); renderModal(); return; }
@@ -2535,6 +2565,7 @@ document.addEventListener("change", async e => {
   }
   if (e.target.dataset && e.target.dataset.tbrtoggle && S.openId){ const x = tbrShelves().find(z => z.id===e.target.dataset.tbrtoggle); tbrToggle(e.target.dataset.tbrtoggle, S.openId, e.target.checked); toast(e.target.checked ? `Added to ${x?x.name:"shelf"}` : `Removed from ${x?x.name:"shelf"}`); render(); return; }
   if (e.target.dataset && e.target.dataset.tbrbook && S.cm?.type==="tbrpick"){ tbrToggle(S.cm.id, e.target.dataset.tbrbook, e.target.checked); return; }
+  if (e.target.dataset && e.target.dataset.moodpick !== undefined){ const m = e.target.dataset.moodpick; S.fMoods = e.target.checked ? [...new Set([...S.fMoods, m])] : S.fMoods.filter(x => x !== m); refreshMoodUI(); const mp = $("#mpop"); if (mp){ const y = mp.querySelector(".mpop-list")?.scrollTop || 0; mp.innerHTML = moodPopHTML(); const l = mp.querySelector(".mpop-list"); if (l) l.scrollTop = y; } return; }
   if (e.target.id==="fOwned"){ S.fOwned=e.target.value; renderGrid(); return; }
   if (e.target.id==="ownedToggle" && S.openId){ const on = e.target.checked; const t = e.target.closest(".own-row")?.querySelector(".own-t .mini"); if (t) t.textContent = on ? "On your shelf at home" : "Not in your collection"; patch(S.openId, {owned: on}); toast(on ? "Marked as owned" : "Marked as not owned"); return; }
   if (e.target.id==="fFormat"){ S.fFormat=e.target.value; renderGrid(); return; }

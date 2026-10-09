@@ -16,6 +16,13 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.33.0 (October 9, 2026)
+- The Library has a **Moods** button that lists every mood on your books, with how many books have each.
+- Check as many moods as you like. Only books tagged with **all** of the checked moods are shown, so "dark" plus "emotional" finds books that are both.
+- Chosen moods show as tags above the books. Tap a tag's × to drop it, or **Clear all**.
+- Tapping a mood on the dashboard starts the Library with that mood checked, and you can add more from there.
+- Pop-up menus in the Library always stay fully on screen on small phones.
+
 ## 1.32.0 (October 9, 2026)
 - Tapping a mood in **How your reading felt** on the dashboard opens the Library showing the finished books with that mood from the year you're viewing (or all time).
 - A **Mood** tag above the books shows the filter. Tap its × to clear it, or tap **All** to see every book with that mood, read or not.
