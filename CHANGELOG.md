@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.22.1 (October 8, 2026)
+- On phones and tablets, the cover size slider only responds after you press and hold it, so scrolling past it no longer changes the size by accident. A quick tap shows a reminder of how to use it.
+
 ## 1.22.0 (October 8, 2026)
 - The Library has a cover size slider above the books. Smaller covers fit more books on screen, and larger ones show more detail.
 - On a phone, pinch the covers with two fingers to resize them. On a laptop, pinch the trackpad.

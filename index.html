@@ -269,6 +269,7 @@ body.ns-dragging,body.ns-dragging *{cursor:grabbing !important}
 .lib-head .lib-count{margin:0}
 .gsize{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
 .gsize input{width:130px;accent-color:var(--accent)}
+@media (pointer:coarse){.gsize{touch-action:pan-y;padding:8px 0;border-radius:99px;transition:background .15s}.gsize input{pointer-events:none}.gsize.armed{background:color-mix(in srgb, var(--accent) 12%, transparent)}.gsize.armed input{transform:scaleY(1.25)}}
 .gsize svg{width:14px;height:14px;flex:0 0 auto}
 .gsize svg.big{width:20px;height:20px}
 .card{display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -1432,6 +1433,23 @@ function setGridSize(v, save){
   const r = $("#gridSize"); if (r && document.activeElement !== r) r.value = v;
   if (save) try { localStorage.setItem("ns-grid", String(v)); } catch(_){}
 }
+/* on touch screens the size slider only responds after a press and hold, so scrolling past it can't change the size */
+let gsHold = null;
+const gsCoarse = () => matchMedia("(pointer:coarse)").matches;
+function gsFromX(x){ const r = $("#gridSize"); if (!r) return; const b = r.getBoundingClientRect(); const t = Math.max(0, Math.min(1, (x - b.left) / b.width)); setGridSize(GRID_MIN + t * (GRID_MAX - GRID_MIN), false); }
+document.addEventListener("touchstart", e => {
+  const w = e.target.closest && e.target.closest(".gsize"); if (!w || !gsCoarse() || e.touches.length !== 1) return;
+  const t0 = e.touches[0], h = gsHold = {w, x:t0.clientX, y:t0.clientY, armed:false};
+  h.timer = setTimeout(() => { if (gsHold !== h) return; h.armed = true; w.classList.add("armed"); if (navigator.vibrate) try { navigator.vibrate(10); } catch(_){} gsFromX(h.x); }, 350);
+}, {passive:true});
+document.addEventListener("touchmove", e => {
+  const h = gsHold; if (!h) return; const t0 = e.touches[0];
+  if (!h.armed){ if (Math.hypot(t0.clientX - h.x, t0.clientY - h.y) > 8){ clearTimeout(h.timer); gsHold = null; } return; }
+  if (e.cancelable) e.preventDefault(); gsFromX(t0.clientX);
+}, {passive:false});
+const gsEnd = () => { const h = gsHold; if (!h) return; gsHold = null; clearTimeout(h.timer);
+  if (h.armed){ h.w.classList.remove("armed"); setGridSize(S.gridSize, true); } else toast("Press and hold the slider to resize, or pinch the covers"); };
+document.addEventListener("touchend", gsEnd); document.addEventListener("touchcancel", () => { const h = gsHold; if (h){ gsHold = null; clearTimeout(h.timer); h.w.classList.remove("armed"); } });
 let pinch = null;
 document.addEventListener("touchstart", e => {
   if (e.touches.length !== 2 || !e.target.closest || !e.target.closest("#grid .grid")) return;
@@ -1637,7 +1655,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.22.0";
+const APP_VERSION = "1.22.1";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
