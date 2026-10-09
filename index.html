@@ -184,7 +184,10 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 
 .reading-list{display:flex;flex-direction:column;gap:14px}
 .reading-item{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;cursor:pointer;background:none;border:0;text-align:left;padding:0}
-.reading-item.ns-drag{grid-template-columns:52px 1fr 18px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;border-radius:10px;transition:background .15s}
+.reading-item.ns-drag{grid-template-columns:52px 1fr 18px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;border-radius:12px;padding:8px 10px;margin:0 -10px;transition:background .15s, box-shadow .15s}
+.reading-list:has(.ns-drag){gap:2px}
+@media (hover:hover){.reading-item.ns-drag:hover{background:color-mix(in srgb, var(--accent) 8%, transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);cursor:grab}.reading-item.ns-drag:hover .ns-grip{opacity:1;color:var(--ink)}}
+.reading-item.ns-drag:focus-visible{outline:2px solid var(--accent);outline-offset:0}
 .reading-item.ns-drag img{-webkit-user-drag:none;pointer-events:none}
 .ns-grip{color:var(--muted);font-size:14px;letter-spacing:-3px;opacity:.45;cursor:grab;text-align:center}
 .reading-item.ns-drag:hover .ns-grip{opacity:.9}
@@ -1564,7 +1567,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-x";
+const APP_VERSION = "2026.10.08-y";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
