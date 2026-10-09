@@ -331,6 +331,13 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .f{display:flex;flex-direction:column;gap:5px;min-width:0}
 .f.full{grid-column:1/-1}
 .f label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.dlabel{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.dmode{display:inline-flex;border:1px solid var(--line);border-radius:99px;padding:2px;background:var(--bg)}
+.f .dm{font-size:11.5px;letter-spacing:.02em;text-transform:none;font-weight:700;padding:3px 10px;border-radius:99px;cursor:pointer;color:var(--muted)}
+.f .dm.on{background:var(--accent);color:var(--accent-ink)}
+.dm input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.dm:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+.dest{display:grid;grid-template-columns:1fr 96px;gap:8px}
 .f input,.f select,.f textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 11px;width:100%;min-width:0}
 .f textarea{min-height:84px;resize:vertical}
 .cover-pick{display:grid;grid-template-columns:110px 1fr;gap:16px;align-items:start;grid-column:1/-1}
@@ -519,7 +526,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const hash = s => { let h=0; for (const c of String(s)) h = (h*31 + c.charCodeAt(0))|0; return Math.abs(h); };
 const hueOf = b => (b.hue ?? HUES[hash(b.title||"") % HUES.length]);
 const yr = d => d ? Number(String(d).slice(0,4)) : null;
-const fmtDate = d => { if(!d) return "—"; const [y,m,dd]=d.split("-").map(Number); return `${MONTHS[m-1]} ${dd}, ${y}`; };
+const fmtDate = d => { if(!d) return "—"; const [y,m,dd]=String(d).split("-").map(Number);
+  if (!m) return `${y} (estimate)`; if (!dd) return `${MONTHS[m-1]} ${y} (estimate)`; return `${MONTHS[m-1]} ${dd}, ${y}`; };
+const isEstDate = d => !!d && String(d).length < 10;
 const stars = r => { r = Number(r)||0; if(!r) return ""; const f=Math.floor(r); return "★".repeat(f) + (r-f>=.5?"½":""); };
 const money = n => "$" + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
 
@@ -1315,7 +1324,7 @@ function dashHTML(){
     return (v?`<rect class="b${i===nowM?" now":""}" x="${x}" y="${top}" width="${w}" height="${H-B-top}" rx="3"/><text class="val" x="${x+w/2}" y="${top-5}" text-anchor="middle">${v}</text>`:"") +
       `<text x="${x+w/2}" y="${H-9}" text-anchor="middle">${MONTHS[i]}</text>`; }).join("");
   const chart = `<section class="panel"><div class="panel-h"><h2>Books finished by month</h2><span class="eyebrow">${y}</span></div>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Books finished per month in ${y}">${grid}${bars}</svg></section>`;
+    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Books finished per month in ${y}">${grid}${bars}</svg>${(() => { const n = fin.filter(b => !Number(String(b.finishDate||"").slice(5,7))).length; return n ? `<p class="mini" style="margin:6px 0 0">+ ${n} book${n===1?"":"s"} finished sometime in ${y} (no month given)</p>` : ""; })()}</section>`;
 
   // genres + formats
   const src = fin.length ? fin : [];
@@ -1426,6 +1435,16 @@ function renderGrid(){
 }
 
 /* ---------- modal ---------- */
+/* a date that can be exact (YYYY-MM-DD) or an estimate (YYYY-MM or YYYY) */
+function dateFieldHTML(k, label, d){
+  const v = String(d[k + "Date"] || ""), mode = d[k + "Mode"] || (isEstDate(v) ? "est" : "exact");
+  const [yy, mm] = v.split("-");
+  const tog = `<span class="dmode" role="radiogroup" aria-label="${label}: exact or estimate">${[["exact","Exact"],["est","Estimate"]].map(([m,l]) => `<label class="dm${mode===m?" on":""}"><input type="radio" name="${k}Mode" value="${m}" ${mode===m?"checked":""}>${l}</label>`).join("")}</span>`;
+  const body = mode === "est"
+    ? `<span class="dest"><select name="${k}M" aria-label="${label} month (optional)"><option value="">Any month</option>${MONTHS.map((n,i) => { const val = String(i+1).padStart(2,"0"); return `<option value="${val}" ${mm===val?"selected":""}>${n}</option>`; }).join("")}</select><input name="${k}Y" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Year" value="${esc(yy||"")}" aria-label="${label} year"></span>`
+    : `<input id="f-${k}" name="${k}Date" type="date" value="${esc(isEstDate(v) ? "" : v)}">`;
+  return `<div class="f"><div class="dlabel"><label ${mode==="exact"?`for="f-${k}"`:""}>${label}</label>${tog}</div>${body}</div>`;
+}
 function blank(){ return {title:"",author:"",genre:"",format:"Print",status:"tbr",rating:"",pages:"",currentPage:"",startDate:"",finishDate:"",source:"",cost:"",review:"",notes:"",quote:"",dateAdded:today(),hue:null,coverId:null}; }
 
 function renderModal(){
@@ -1520,8 +1539,8 @@ function formHTML(){
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
       <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>` : ""}
       <div class="f"><label for="f-cur">Pages read</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.status==="finished" && !(Number(d.currentPage) > 0) ? (d.pages||"") : d.currentPage)}"></div>
-      <div class="f"><label for="f-start">Date started</label><input id="f-start" name="startDate" type="date" value="${esc(d.startDate)}"></div>
-      <div class="f"><label for="f-finish">Date finished</label><input id="f-finish" name="finishDate" type="date" value="${esc(d.finishDate)}"></div>
+      ${dateFieldHTML("start", "Date started", d)}
+      ${dateFieldHTML("finish", "Date finished", d)}
       <div class="f"><label for="f-cost">Cost ($)</label><input id="f-cost" name="cost" type="number" min="0" step="0.01" value="${esc(d.cost)}"></div>
       <div class="f"><label for="f-added">Date added</label><input id="f-added" name="dateAdded" type="date" value="${esc(d.dateAdded)}"></div>
       <div class="f"><label for="f-series">Series</label><input id="f-series" name="series" value="${esc(d.series||"")}" placeholder="e.g. The Empyrean, #1"></div>
@@ -1545,12 +1564,19 @@ function readForm(){
   if (f.elements.aLenH){ S.draft.audioSeconds = hmToSec(S.draft.aLenH, S.draft.aLenM) || ""; S.draft.audioPos = hmToSec(S.draft.aPosH, S.draft.aPosM) || ""; }
   ["aLenH","aLenM","aPosH","aPosM"].forEach(k => delete S.draft[k]);
   if (S.draft.genre === "__other") S.draft.genre = String(S.draft.genreOther||"").trim();
+  ["start","finish"].forEach(k => {
+    if (S.draft[k + "Mode"] === "est" && f.elements[k + "Y"]){
+      const Y = String(S.draft[k + "Y"]||"").trim(), M = S.draft[k + "M"]||"";
+      S.draft[k + "Date"] = /^\d{4}$/.test(Y) ? (M ? `${Y}-${M}` : Y) : "";
+    }
+    delete S.draft[k + "Y"]; delete S.draft[k + "M"];
+  });
   delete S.draft.genreOther;
 }
 
 function clean(d){
   const n = v => v===""||v==null ? "" : Number(v);
-  const {id:_id, example:_ex, ...rest} = d;
+  const {id:_id, example:_ex, startMode:_sm, finishMode:_fm, startY:_sy, startM:_smo, finishY:_fy, finishM:_fmo, ...rest} = d;
   const moods = Array.isArray(d.moods) ? d.moods : String(d.moods||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
   const o = {...rest, moods, series:(d.series||"").trim(), communityRating:n(d.communityRating), pace:d.pace||"", summary:(d.summary||"").trim(),
     title:d.title.trim(),author:(d.author||"").trim(),genre:(d.genre||"").trim(),format:d.format||"Print",status:d.status||"tbr",
@@ -1567,7 +1593,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-z";
+const APP_VERSION = "2026.10.08-za";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2313,6 +2339,7 @@ document.addEventListener("change", async e => {
   if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
   if (e.target.dataset && e.target.dataset.st && S.cm?.type==="cats"){ const k = e.target.dataset.st, v = e.target.value.trim(); const n = {...(S.settings.statusNames||{})}; if (!v || v === STATUS[k]) delete n[k]; else n[k] = v; saveSettings({statusNames: n}); render(); renderModal(); return; }
   if (e.target.dataset && e.target.dataset.cstI !== undefined && S.cm?.type==="cats"){ const v = e.target.value.trim(), list = customStatuses().map(x => ({...x})), i = Number(e.target.dataset.cstI); if (v && list[i]){ list[i].name = v; saveSettings({statuses: list}); render(); } renderModal(); return; }
+  if ((e.target.name==="startMode" || e.target.name==="finishMode") && S.editing){ readForm(); renderModal(); document.querySelector(`[name="${e.target.name}"][value="${e.target.value}"]`)?.focus(); return; }
   if (e.target.id==="f-status" && S.editing){ readForm();
     if (S.draft.status==="finished"){ if (Number(S.draft.pages)) S.draft.currentPage = Number(S.draft.pages); if (S.draft.format==="Audiobook" && Number(S.draft.audioSeconds)) S.draft.audioPos = Number(S.draft.audioSeconds); }
     renderModal(); $("#f-status")?.focus(); return; }
