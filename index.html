@@ -242,7 +242,8 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 /* library */
 .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
 .search{flex:1 1 220px;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#fYearWrap:empty{display:none}#fYearWrap{margin-left:6px}
 .chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13.5px;font-weight:500}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:26px 20px}
@@ -499,7 +500,7 @@ const today = () => new Date().toLocaleDateString("en-CA");
 const thisYear = new Date().getFullYear();
 
 const S = { tab:"dash", year:thisYear, books:[], settings:{goals:{}}, loaded:false, db:null, assets:null, canWrite:true, noDb:false,
-  q:"", fStatus:"all", fGenre:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
+  q:"", fStatus:"all", fYear:"all", fGenre:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
   sample:null, imp:null, sum:null, challenges:[], cm:null, pendingSlot:null, fChal:"", coverMap:{}, user:null, unsubs:[], ol:null };
 const PACES = ["slow","medium","fast"];
 let shelfDrag = null;
@@ -1303,6 +1304,20 @@ function dashHTML(){
   return `<div class="dash">${body || `<div class="panel empty">Everything on the dashboard is hidden. Choose <b>Customize dashboard</b> to bring sections back.</div>`}${custom}</div>`;
 }
 
+function fYearHTML(){
+  if (S.fStatus !== "finished") return "";
+  const now = new Date().getFullYear(), fin = S.books.filter(b => b.status === "finished");
+  const years = [...new Set(fin.map(b => yr(b.finishDate)).filter(y => y && y !== now))].sort((a,b) => b - a);
+  const undated = fin.some(b => !yr(b.finishDate));
+  if (!["all","this","none"].includes(S.fYear) && !years.includes(Number(S.fYear))) S.fYear = "all";
+  const o = (v, l) => `<option value="${v}" ${String(S.fYear)===String(v)?"selected":""}>${l}</option>`;
+  return `<select class="pill" id="fYear" aria-label="Year finished">${o("all","All years")}${o("this",`This year (${now})`)}${years.map(y => o(y, y)).join("")}${undated ? o("none","No finish date") : ""}</select>`;
+}
+function yearOk(b){
+  if (S.fStatus !== "finished" || S.fYear === "all") return true;
+  const y = yr(b.finishDate);
+  return S.fYear === "this" ? y === new Date().getFullYear() : S.fYear === "none" ? !y : y === Number(S.fYear);
+}
 function libHTML(){
   const genres = [...new Set(S.books.map(b=>b.genre).filter(Boolean))].sort();
   const chip = (v,l) => `<button class="chip" data-act="fstatus" data-v="${v}" aria-pressed="${S.fStatus===v}">${l}</button>`;
@@ -1316,7 +1331,7 @@ function libHTML(){
         ${[["added","Recently added"],["finished","Recently finished"],["title","Title A–Z"],["author","Author A–Z"],["rating","My highest rated"],["community","Goodreads rating"]].map(([v,l])=>`<option value="${v}" ${S.sort===v?"selected":""}>${l}</option>`).join("")}
       </select>
     </div>
-    <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${allStatuses().map(([k,l]) => chip(k, esc(l))).join("")}</div>
+    <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${allStatuses().map(([k,l]) => chip(k, esc(l))).join("")}<span id="fYearWrap">${fYearHTML()}</span></div>
     <div id="grid"></div>`;
 }
 
@@ -1334,7 +1349,7 @@ function renderGrid(){
   if (S.fChal.startsWith("c:") && !S.challenges.some(c=>"c:"+c.id===S.fChal)) S.fChal = "";
   const chalOk = b => !S.fChal || (S.fChal==="any" ? !!inChal[b.id] : S.fChal==="none" ? !inChal[b.id] : (inChal[b.id]||[]).some(x=>"c:"+x.c.id===S.fChal));
   let list = S.books.filter(b =>
-    (S.fStatus==="all" || b.status===S.fStatus) && (!S.fGenre || b.genre===S.fGenre) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
+    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
     (!q || [b.title,b.author,b.genre,b.series,b.review,b.notes,b.quote,b.summary,(b.moods||[]).join(" "),(b.tags||[]).join(" ")].some(x => String(x||"").toLowerCase().includes(q))));
   const by = {
     added:(a,b)=>(b.dateAdded||"").localeCompare(a.dateAdded||"") || (b.createdAt||0)-(a.createdAt||0),
@@ -1495,7 +1510,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-u";
+const APP_VERSION = "2026.10.08-v";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2161,7 +2176,7 @@ document.addEventListener("click", async e => {
   if (act==="cancel-edit"){ if(S.openId==="new"){ S.openId=null; S.pendingSlot=null; } S.editing=false; S.err=""; renderModal(); return; }
   if (act==="hue"){ readForm(); S.draft.hue=Number(el.dataset.h); renderModal(); return; }
   if (act==="remove-cover"){ readForm(); S.draft.coverId=null; renderModal(); return; }
-  if (act==="fstatus"){ S.fStatus=el.dataset.v; document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",String(c.dataset.v===S.fStatus))); renderGrid(); return; }
+  if (act==="fstatus"){ S.fStatus=el.dataset.v; document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",String(c.dataset.v===S.fStatus))); const w=$("#fYearWrap"); if (w) w.innerHTML=fYearHTML(); renderGrid(); return; }
   if (act==="edit-goal"){ S.editingGoal=true; render(); setTimeout(()=>$("#goalInput")?.focus(),20); return; }
   if (act==="cancel-goal"){ S.editingGoal=false; render(); return; }
   if (act==="save-goal"){
@@ -2233,6 +2248,7 @@ document.addEventListener("change", async e => {
   }
   if (e.target.dataset && e.target.dataset.tbrtoggle && S.openId){ const x = tbrShelves().find(z => z.id===e.target.dataset.tbrtoggle); tbrToggle(e.target.dataset.tbrtoggle, S.openId, e.target.checked); toast(e.target.checked ? `Added to ${x?x.name:"shelf"}` : `Removed from ${x?x.name:"shelf"}`); render(); return; }
   if (e.target.dataset && e.target.dataset.tbrbook && S.cm?.type==="tbrpick"){ tbrToggle(S.cm.id, e.target.dataset.tbrbook, e.target.checked); return; }
+  if (e.target.id==="fYear"){ S.fYear=e.target.value; renderGrid(); return; }
   if (e.target.id==="fTbr"){ S.fTbr=e.target.value; renderGrid(); return; }
   if (e.target.id==="f-genre"){ const o = $("#f-genreOther"); if (o){ o.hidden = e.target.value !== "__other"; if (!o.hidden) o.focus(); } return; }
   if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
