@@ -536,7 +536,7 @@ img{max-width:100%}
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const STATUS = {reading:"Reading", tbr:"Want to read", finished:"Finished", dnf:"Did not finish"};
 const FORMATS = ["Print","Ebook","Audiobook"];
-const SOURCES = ["Bought","Library","Gift","Borrowed","Kindle Unlimited","Other"];
+const SOURCES = ["Bought","Library","Gift","Borrowed","Kindle Unlimited"];
 const GENRES = ["Literary fiction","Historical fiction","Romance","Romantasy","Fantasy","Science fiction","Mystery / thriller","Contemporary","Memoir","Nonfiction","Education","Young adult","Middle grade","Children's","Poetry"];
 const HUES = [150,95,40,15,355,320,265,220,195,28];
 const today = () => new Date().toLocaleDateString("en-CA");
@@ -1014,18 +1014,21 @@ const byName = (a, b) => String(a).localeCompare(String(b), undefined, {sensitiv
 const genreList = () => [...(Array.isArray(S.settings.genres) ? S.settings.genres : GENRES)].sort(byName);
 function saveSettings(part){ S.settings = {...S.settings, ...part}; S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err))); }
 function rememberGenre(g){ g = String(g||"").trim(); if (!g) return; const list = genreList(); if (list.some(x => x.toLowerCase() === g.toLowerCase())) return; saveSettings({genres: [...list, g]}); }
+const sourceList = () => Array.isArray(S.settings.sources) ? S.settings.sources : SOURCES;
+function rememberSource(v){ v = String(v||"").trim(); if (!v) return; const list = sourceList(); if (list.some(x => x.toLowerCase() === v.toLowerCase())) return; saveSettings({sources: [...list, v]}); }
 const BUILTIN_ST = ["reading","tbr","finished","dnf"];
 const customStatuses = () => Array.isArray(S.settings.statuses) ? S.settings.statuses : [];
 const stLabel = k => ((S.settings && S.settings.statusNames) || {})[k] || STATUS[k] || (customStatuses().find(x => x.id === k) || {}).name || "";
 const allStatuses = () => [...BUILTIN_ST.map(k => [k, stLabel(k)]), ...customStatuses().map(x => [x.id, x.name])];
 const stClass = k => BUILTIN_ST.includes(k) ? "s-" + k : "s-custom";
 function catsHTML(){
-  const gl = genreList(), counts = {}, sc = {};
+  const gl = genreList(), counts = {}, sc = {}, srcCounts = {};
+  S.books.forEach(b => { if (b.source) srcCounts[b.source] = (srcCounts[b.source]||0) + 1; });
   S.books.forEach(b => { if (b.genre) counts[b.genre] = (counts[b.genre]||0) + 1; sc[b.status] = (sc[b.status]||0) + 1; });
   const nb = n => `${n||0} book${n===1?"":"s"}`;
   const unlisted = Object.keys(counts).filter(g => !gl.includes(g)).sort();
   const names = S.settings.statusNames || {};
-  return `<div class="sheet-h"><h2>Genres &amp; statuses</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+  return `<div class="sheet-h"><h2>Genres, statuses &amp; sources</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b">
     <div class="eyebrow">Genres</div>
     <p class="mini" style="margin:4px 0 10px">These fill the genre menu on every book, in A–Z order. Renaming one also renames it on the books that use it. Removing one takes it out of the menu, but books already in it keep it.</p>
@@ -1038,6 +1041,10 @@ function catsHTML(){
     <div class="cat-list">${BUILTIN_ST.map(k => `<div class="cat-row"><input class="cat-name" data-st="${k}" value="${esc(stLabel(k))}" placeholder="${esc(STATUS[k])}" aria-label="Name for ${esc(STATUS[k])}"><span class="mini num">${nb(sc[k])}</span><span class="status ${stClass(k)}">built in</span></div>`).join("")}
     ${customStatuses().map((x,i) => `<div class="cat-row"><input class="cat-name" data-cst-i="${i}" value="${esc(x.name)}" aria-label="Status name"><span class="mini num">${nb(sc[x.id])}</span><button class="btn ghost sm" data-act="st-del" data-i="${i}">${sc[x.id] ? `Remove (moves ${nb(sc[x.id])} to ${esc(stLabel("tbr"))})` : "Remove"}</button></div>`).join("")}</div>
     <form id="statusAdd" class="cat-add"><input id="newStatus" placeholder="Add a status, like Paused or Owned" aria-label="New status"><button class="btn" type="submit">Add</button></form>
+    <div class="eyebrow" style="margin-top:26px">Sources</div>
+    <p class="mini" style="margin:4px 0 10px">Where your books come from. Sources you type in on a book are added here automatically. Removing one takes it out of the menu, but books keep it.</p>
+    <div class="cat-list">${sourceList().map((x,i) => `<div class="cat-row"><span class="cat-name">${esc(x)}</span><span class="mini num">${nb(srcCounts[x])}</span><button class="btn ghost sm" data-act="src-del" data-i="${i}">Remove</button></div>`).join("")}</div>
+    <form id="sourceAdd" class="cat-add"><input id="newSource" placeholder="Add a source, like Libby or a bookstore" aria-label="New source"><button class="btn" type="submit">Add</button></form>
     <div class="foot"><span></span><button class="btn primary" data-act="close">Done</button></div>
   </div>`;
 }
@@ -1632,7 +1639,7 @@ function formHTML(){
       <div class="f"><label for="f-status">Status</label><select id="f-status" name="status">${allStatuses().map(([k,l])=>`<option value="${k}" ${k===d.status?"selected":""}>${l}</option>`).join("")}</select></div>
       <div class="f"><label for="f-rating">Rating</label><select id="f-rating" name="rating">${ratingOpts}</select></div>
       <div class="f"><label for="f-format">Format</label><select id="f-format" name="format">${opt(FORMATS,d.format)}</select></div>
-      <div class="f"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">—</option>${opt(SOURCES,d.source)}</select></div>
+      <div class="f"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">—</option>${[...sourceList(), ...(d.source && !sourceList().includes(d.source) ? [d.source] : [])].map(x=>`<option value="${esc(x)}" ${x===d.source?"selected":""}>${esc(x)}</option>`).join("")}<option value="__other">Something else…</option></select><input id="f-sourceOther" name="sourceOther" placeholder="Where it came from" aria-label="Your own source" hidden style="margin-top:6px"></div>
       <div class="f"><label for="f-pages">Total pages</label><input id="f-pages" name="pages" type="number" min="0" value="${esc(d.pages)}"></div>
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
       <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>
@@ -1663,6 +1670,8 @@ function readForm(){
   if (f.elements.aLenH){ S.draft.audioSeconds = hmToSec(S.draft.aLenH, S.draft.aLenM) || ""; S.draft.audioPos = hmToSec(S.draft.aPosH, S.draft.aPosM) || ""; }
   ["aLenH","aLenM","aPosH","aPosM"].forEach(k => delete S.draft[k]);
   if (S.draft.genre === "__other") S.draft.genre = String(S.draft.genreOther||"").trim();
+  if (S.draft.source === "__other") S.draft.source = String(S.draft.sourceOther||"").trim();
+  delete S.draft.sourceOther;
   ["start","finish"].forEach(k => {
     if (S.draft[k + "Mode"] === "est" && f.elements[k + "Y"]){
       const Y = String(S.draft[k + "Y"]||"").trim(), M = S.draft[k + "M"]||"";
@@ -1692,7 +1701,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.27.0";
+const APP_VERSION = "1.28.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -1909,7 +1918,7 @@ function accountHTML(){
     ${appearanceHTML()}
     <div class="acct-list">
       <button class="acct-row" data-act="bulk-ol"><b>Find covers &amp; details</b><span class="mini">${need?`${need} book${need===1?"":"s"} without covers or details yet`:"Every book has been checked"}</span></button>
-      <button class="acct-row" data-act="cats"><b>Genres &amp; statuses</b><span class="mini">Add, rename or remove the choices in those menus</span></button>
+      <button class="acct-row" data-act="cats"><b>Genres, statuses &amp; sources</b><span class="mini">Add, rename or remove the choices in those menus</span></button>
       <button class="acct-row" data-act="dash-custom"><b>Customize dashboard</b><span class="mini">Choose which sections and stats to show</span></button>
       <button class="acct-row" data-act="import"><b>Import books</b><span class="mini">From Goodreads, StoryGraph or a Nightstand backup</span></button>
       <button class="acct-row" data-act="backup"><b>Download a backup</b><span class="mini">${S.books.length} books and ${S.challenges.length} challenge${S.challenges.length===1?"":"s"} in one file</span></button>
@@ -2299,6 +2308,7 @@ document.addEventListener("click", async e => {
     i.value = String(n); const f = i.form.elements.audioSpeedSet; if (f) f.value = "1"; S.dirty = true; return; }
   if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
   if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
+  if (act==="src-del"){ const l = [...sourceList()]; l.splice(Number(el.dataset.i), 1); saveSettings({sources: l}); renderModal(); return; }
   if (act==="genre-del"){ const gl = [...genreList()]; gl.splice(Number(el.dataset.i), 1); saveSettings({genres: gl}); renderModal(); return; }
   if (act==="genre-add-un"){ rememberGenre(el.dataset.g); renderModal(); return; }
   if (act==="genre-defaults"){ const gl = [...genreList()]; GENRES.forEach(g => { if (!gl.includes(g)) gl.push(g); }); saveSettings({genres: gl}); renderModal(); return; }
@@ -2437,12 +2447,13 @@ document.addEventListener("submit", async e => {
     if (m.id) saveTbr(tbrShelves().map(x => x.id===m.id ? {...x, name, note} : x));
     else saveTbr([...tbrShelves(), {id:"t"+Date.now().toString(36), name, note, books: m.forBook ? [m.forBook] : [], createdAt:Date.now()}]);
     toast(m.id ? "Shelf saved" : m.forBook ? `Added to ${name}` : `${name} shelf created`); S.cm=null; S.openId = m.forBook || null; render(); return; }
+  if (e.target.id==="sourceAdd"){ e.preventDefault(); const v = $("#newSource").value.trim(); if (!v) return; if (sourceList().some(x => x.toLowerCase() === v.toLowerCase())){ toast(`${v} is already in the list`); return; } rememberSource(v); renderModal(); $("#newSource")?.focus(); return; }
   if (e.target.id==="genreAdd"){ e.preventDefault(); const v = $("#newGenre").value.trim(); if (!v) return; if (genreList().some(g => g.toLowerCase() === v.toLowerCase())){ toast(`${v} is already in the list`); return; } rememberGenre(v); renderModal(); $("#newGenre")?.focus(); return; }
   if (e.target.id==="statusAdd"){ e.preventDefault(); const v = $("#newStatus").value.trim(); if (!v) return; if (allStatuses().some(([,l]) => l.toLowerCase() === v.toLowerCase())){ toast(`${v} is already a status`); return; } saveSettings({statuses: [...customStatuses(), {id: "c" + Date.now().toString(36), name: v}]}); render(); renderModal(); $("#newStatus")?.focus(); return; }
   if (e.target.id!=="bookForm") return;
   e.preventDefault(); readForm();
   if (!S.draft.title.trim()){ S.err="Give the book a title."; renderModal(); return; }
-  const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
+  const data = clean(S.draft); delete data.example; rememberGenre(data.genre); rememberSource(data.source);
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
   { const sp = Number(data.audioSpeed), set = data.audioSpeedSet === "1" || data.audioSpeedSet === 1; delete data.audioSpeedSet;
@@ -2471,6 +2482,7 @@ document.addEventListener("change", async e => {
   if (e.target.id==="fFormat"){ S.fFormat=e.target.value; renderGrid(); return; }
   if (e.target.id==="fYear"){ S.fYear=e.target.value; renderGrid(); return; }
   if (e.target.id==="fTbr"){ S.fTbr=e.target.value; renderGrid(); return; }
+  if (e.target.id==="f-source"){ const o = $("#f-sourceOther"); if (o){ o.hidden = e.target.value !== "__other"; if (!o.hidden) o.focus(); } return; }
   if (e.target.id==="f-genre"){ const o = $("#f-genreOther"); if (o){ o.hidden = e.target.value !== "__other"; if (!o.hidden) o.focus(); } return; }
   if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
   if (e.target.dataset && e.target.dataset.st && S.cm?.type==="cats"){ const k = e.target.dataset.st, v = e.target.value.trim(); const n = {...(S.settings.statusNames||{})}; if (!v || v === STATUS[k]) delete n[k]; else n[k] = v; saveSettings({statusNames: n}); render(); renderModal(); return; }

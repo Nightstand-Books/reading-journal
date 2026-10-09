@@ -16,6 +16,11 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.28.0 (October 8, 2026)
+- The Source menu in Edit book has **Something else…**, so you can type your own source (like Libby or a bookstore). It's remembered and added to the menu for next time.
+- The account menu editor is now **Genres, statuses & sources**, where you can add or remove sources.
+- "Other" was removed from the starting source list, since you can now name your own. Books already marked "Other" keep it.
+
 ## 1.27.0 (October 8, 2026)
 - Each book's page has an **I own this book** checkbox, right on the page without opening Edit book.
 - The Library can filter by Owned or Not owned, together with the other filters.
