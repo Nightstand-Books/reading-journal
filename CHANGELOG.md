@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.32.0 (October 9, 2026)
+- Tapping a mood in **How your reading felt** on the dashboard opens the Library showing the finished books with that mood from the year you're viewing (or all time).
+- A **Mood** tag above the books shows the filter. Tap its × to clear it, or tap **All** to see every book with that mood, read or not.
+
 ## 1.31.1 (October 9, 2026)
 - In the All time view, "Your biggest year was…" starts on its own line.
 

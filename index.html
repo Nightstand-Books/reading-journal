@@ -425,6 +425,10 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .moods{display:flex;flex-wrap:wrap;gap:8px}
 .mood{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:999px;background:color-mix(in srgb,var(--brass) calc(var(--k)*30% + 6%),var(--surface));border:1px solid color-mix(in srgb,var(--brass) 35%,transparent);font-size:calc(13px + var(--k)*5px)}
 .mood i{font-style:normal;font-size:12px;color:var(--muted)}
+button.mood{font:inherit;font-size:calc(13px + var(--k)*5px);color:var(--ink);cursor:pointer;transition:transform .12s, box-shadow .12s}
+button.mood:hover{transform:translateY(-1px);box-shadow:0 4px 10px -6px rgba(0,0,0,.35)}
+.fmood{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:5px 8px 5px 12px;font-size:13.5px;background:color-mix(in srgb,var(--brass) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--brass) 45%,transparent);margin:0 0 14px}
+.fmood button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px}
 /* challenges */
 .chal-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .chal{margin-bottom:18px}
@@ -558,7 +562,7 @@ const today = () => new Date().toLocaleDateString("en-CA");
 const thisYear = new Date().getFullYear();
 
 const S = { tab:"dash", year:thisYear, books:[], settings:{goals:{}}, loaded:false, db:null, assets:null, canWrite:true, noDb:false,
-  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", fOwned:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
+  q:"", fStatus:"all", fYear:"all", fGenre:"", fFormat:"", fOwned:"", fMood:"", sort:"added", openId:null, editing:false, draft:null, editingGoal:false, armedDelete:false, busy:false, err:"",
   sample:null, imp:null, sum:null, challenges:[], cm:null, pendingSlot:null, fChal:"", coverMap:{}, user:null, unsubs:[], ol:null };
 const PACES = ["slow","medium","fast"];
 let shelfDrag = null;
@@ -1438,7 +1442,7 @@ function dashHTML(){
     const ml = Object.entries(mm).sort((a,b)=>b[1]-a[1]).slice(0,12); const mmax = ml[0]?.[1]||1;
     const top = ml.slice(0,2).map(x=>x[0]);
     const moodPanel = `<section class="panel"><div class="panel-h"><h2>How your ${all ? "" : y + " "}reading felt</h2><span class="eyebrow">${withMood.length} book${withMood.length===1?"":"s"} with moods</span></div>
-      ${ml.length?`<p class="mini" style="margin:-4px 0 12px">Mostly <b>${top.map(esc).join("</b> and <b>")}</b>.</p><div class="moods">${ml.map(([m,n])=>`<span class="mood" style="--k:${(n/mmax).toFixed(2)}">${esc(m)}<i class="num">${n}</i></span>`).join("")}</div>`:`<p class="empty">No moods on this year's finished books yet.</p>`}</section>`;
+      ${ml.length?`<p class="mini" style="margin:-4px 0 12px">Mostly <b>${top.map(esc).join("</b> and <b>")}</b>.</p><div class="moods">${ml.map(([m,n])=>`<button class="mood" data-act="mood-go" data-m="${esc(m)}" style="--k:${(n/mmax).toFixed(2)}" title="See the books tagged ${esc(m)}">${esc(m)}<i class="num">${n}</i></button>`).join("")}</div>`:`<p class="empty">No moods on this year's finished books yet.</p>`}</section>`;
     const pc = {slow:0,medium:0,fast:0}; withPace.forEach(b=>{ const p=String(b.pace).toLowerCase(); if(p in pc) pc[p]++; });
     const pt = Object.values(pc).reduce((a,b)=>a+b,0)||1;
     const pcol = {slow:"var(--accent)",medium:"var(--brass)",fast:"var(--rust)"};
@@ -1490,6 +1494,7 @@ function libHTML(){
       </select>
     </div>
     <div class="chips" style="margin:-6px 0 18px">${chip("all","All")}${allStatuses().map(([k,l]) => chip(k, esc(l))).join("")}<span id="fYearWrap">${fYearHTML()}</span></div>
+    ${S.fMood ? `<div class="fmood">Mood: <b>${esc(S.fMood)}</b><button data-act="mood-clear" aria-label="Clear mood filter" title="Clear">×</button></div>` : ""}
     <div id="grid"></div>`;
 }
 
@@ -1555,7 +1560,7 @@ function renderGrid(){
   if (S.fChal.startsWith("c:") && !S.challenges.some(c=>"c:"+c.id===S.fChal)) S.fChal = "";
   const chalOk = b => !S.fChal || (S.fChal==="any" ? !!inChal[b.id] : S.fChal==="none" ? !inChal[b.id] : (inChal[b.id]||[]).some(x=>"c:"+x.c.id===S.fChal));
   let list = S.books.filter(b =>
-    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && (!S.fOwned || (S.fOwned==="yes") === !!b.owned) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
+    (S.fStatus==="all" || b.status===S.fStatus) && yearOk(b) && (!S.fGenre || b.genre===S.fGenre) && (!S.fFormat || (b.format || "Print")===S.fFormat) && (!S.fOwned || (S.fOwned==="yes") === !!b.owned) && (!S.fMood || (Array.isArray(b.moods) && b.moods.some(m => String(m).trim().toLowerCase() === S.fMood))) && chalOk(b) && (!S.fTbr || shelvesFor(b.id).some(x => x.id===S.fTbr)) &&
     (!q || [b.title,b.author,b.genre,b.series,b.review,b.notes,b.quote,b.summary,(b.moods||[]).join(" "),(b.tags||[]).join(" ")].some(x => String(x||"").toLowerCase().includes(q))));
   const by = {
     added:(a,b)=>(b.dateAdded||"").localeCompare(a.dateAdded||"") || (b.createdAt||0)-(a.createdAt||0),
@@ -1747,7 +1752,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.31.1";
+const APP_VERSION = "1.32.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2352,6 +2357,9 @@ document.addEventListener("click", async e => {
   if (act==="spd-step"){ const i=$("#f-speed"); if (!i) return; const v = Number(i.value) || 1, d = Number(el.dataset.d);
     let n = d > 0 ? Math.floor(v * 4 + 1e-9) / 4 + .25 : Math.ceil(v * 4 - 1e-9) / 4 - .25; n = Math.max(.5, Math.min(4, n));
     i.value = String(n); const f = i.form.elements.audioSpeedSet; if (f) f.value = "1"; S.dirty = true; return; }
+  if (act==="mood-go"){ S.fMood = el.dataset.m; S.fStatus = "finished"; S.fYear = S.year === "all" ? "all" : (S.year === new Date().getFullYear() ? "this" : S.year);
+    S.q = ""; S.fGenre = ""; S.fFormat = ""; S.fOwned = ""; S.fTbr = ""; S.fChal = ""; S.tab = "lib"; render(); window.scrollTo(0, 0); return; }
+  if (act==="mood-clear"){ S.fMood = ""; render(); return; }
   if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
   if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
   if (act==="store-del"){ const l = [...storeList()]; l.splice(Number(el.dataset.i), 1); saveSettings({stores: l}); renderModal(); return; }
