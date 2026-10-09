@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.28.3 (October 8, 2026)
+- The owned setting is a checkbox again, now labeled simply **Owned**, with "On your shelf at home" or "Not in your collection" underneath.
+- TBR shelf buttons on a book's page show a checkmark when the book is on that shelf and a + when it isn't, so they no longer look like the Owned checkbox.
+
 ## 1.28.2 (October 8, 2026)
 - The **I own this book** switch sits right next to its label instead of far off to the right.
 
