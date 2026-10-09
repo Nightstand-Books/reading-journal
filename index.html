@@ -233,6 +233,15 @@ body.ns-dragging,body.ns-dragging *{cursor:grabbing !important}
 .hm{width:58px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 8px;font-variant-numeric:tabular-nums}
 .hm-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
 .f .spd input{width:70px;flex:0 0 70px;text-align:center;-moz-appearance:textfield}.spd input::-webkit-inner-spin-button,.spd input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.own-row{display:flex;align-items:center;gap:12px;cursor:pointer;max-width:420px}
+.own-ic{width:22px;height:22px;flex:0 0 auto;color:var(--muted)}
+.own-row:has(.switch:checked) .own-ic{color:var(--accent)}
+.own-t{display:flex;flex-direction:column;flex:1;min-width:0}
+.switch{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;flex:0 0 auto;margin:0;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch:checked{background:var(--accent)}
+.switch:checked::after{transform:translateX(18px)}
+.switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .spd-b{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .spd-b:hover{border-color:var(--muted)}
 .upnext-check input{width:18px;height:18px;margin:0}
@@ -1245,6 +1254,14 @@ async function runSpineQueue(){
 }
 
 /* ---------- render ---------- */
+/* keep your place: repainting the page never moves the scroll position */
+const viewHTML = () => S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML();
+function paintView(keep = true){
+  const y = window.scrollY;
+  $("#view").innerHTML = viewHTML();
+  if (S.tab==="lib") renderGrid();
+  if (keep && S.modalY == null && Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+}
 function render(){
   if (shelfDrag || (unDrag && unDrag.started) || (nsDrag && nsDrag.started)) { renderModal(); return; }
   const ys = yearsAvailable();
@@ -1252,9 +1269,9 @@ function render(){
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===S.tab)));
   $("#addBtn").hidden = !S.canWrite || S.noDb;
   renderNotice();
-  $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML();
+  const sameTab = S.tab === S.lastTab; S.lastTab = S.tab;
+  paintView(sameTab);
   if (S.tab==="dash" && S.loaded) queueSpineColors(finishedIn(S.year));
-  if (S.tab==="lib") renderGrid();
   renderModal();
 }
 
@@ -1553,8 +1570,12 @@ function blank(){ return {title:"",author:"",genre:"",format:"Print",status:"tbr
 function renderModal(){
   const scrim = $("#scrim"), sheet = $("#sheet");
   queueMicrotask(() => { if (!sheet.querySelector(FORM_SEL)) S.dirty = false; });
-  if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML=""; document.body.style.overflow=""; return; }
-  scrim.hidden = false; document.body.style.overflow="hidden";
+  const bs = document.body.style;
+  if (!S.openId && !S.cm){ scrim.hidden = true; sheet.innerHTML="";
+    if (S.modalY != null){ const y = S.modalY; S.modalY = null; bs.position = ""; bs.top = ""; bs.left = ""; bs.right = ""; bs.overflow = ""; window.scrollTo(0, y); }
+    return; }
+  if (S.modalY == null){ S.modalY = window.scrollY; bs.position = "fixed"; bs.top = -S.modalY + "px"; bs.left = "0"; bs.right = "0"; bs.overflow = "hidden"; }
+  scrim.hidden = false;
   if (S.cm){ sheet.innerHTML = S.cm.type==="account" ? accountHTML() : S.cm.type==="bulk" ? bulkHTML() : S.cm.type==="covers" ? coversHTML() : S.cm.type==="spine" ? spineEditHTML() : S.cm.type==="deco" ? decoPaletteHTML() : S.cm.type==="dash" ? dashCustomHTML() : S.cm.type==="cats" ? catsHTML() : S.cm.type==="tbrshelf" ? tbrShelfHTML() : S.cm.type==="tbrpick" ? tbrPickHTML() : S.cm.type==="aed" ? aedHTML() : cmHTML(); return; }
   if (S.openId==="import"){ sheet.innerHTML = importHTML(); return; }
   if (S.editing){ sheet.innerHTML = formHTML(); return; }
@@ -1571,7 +1592,7 @@ function renderModal(){
       <div class="mini num">${esc(pr.line)}${pr.left ? " · " + esc(pr.left) : ""}${isAudio(b) && !tot ? ". Enter the audiobook length above to track by time." : ""}</div></div>` : "";
   const quick = S.canWrite && b.status==="tbr" ? `<div class="block quick-row"><button class="btn primary" data-act="start">Start reading today</button>
       <label class="check upnext-check"><input type="checkbox" id="unToggle" ${inUpNext(b.id)?"checked":""}> <span><b>Up next</b><span class="mini" style="display:block">Show it in Up next on the dashboard</span></span></label></div>` : "";
-  const ownBlock = S.canWrite && !S.noDb ? `<div class="block"><label class="check upnext-check"><input type="checkbox" id="ownedToggle" ${b.owned?"checked":""}> <span><b>I own this book</b><span class="mini" style="display:block">Filter by owned books in the Library</span></span></label></div>` : (b.owned ? `<div class="block mini">Owned</div>` : "");
+  const ownBlock = S.canWrite && !S.noDb ? `<div class="block"><label class="own-row"><svg class="own-ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 17.5h16M4 17V5.5h2.6V17M8 17V3.5h2.6V17M12.3 17l-1.1-10.6 2.5-.3L14.9 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="own-t"><b>I own this book</b><span class="mini">${b.owned ? "On your shelf at home" : "Not in your collection"}</span></span><input type="checkbox" role="switch" class="switch" id="ownedToggle" ${b.owned?"checked":""} aria-label="I own this book"></label></div>` : (b.owned ? `<div class="block mini">Owned</div>` : "");
   const tbrBlock = S.canWrite && !S.noDb ? `<div class="block"><div class="eyebrow">TBR shelves</div><div class="tbr-chips">${tbrShelves().map(x => `<label class="tbr-chip"><input type="checkbox" data-tbrtoggle="${esc(x.id)}" ${(x.books||[]).includes(b.id)?"checked":""}> ${esc(x.name)}</label>`).join("")}<button class="btn ghost sm" data-act="tbr-new-for">+ New shelf</button></div></div>` : "";
   sheet.innerHTML = `<div class="sheet-h"><span class="status ${stClass(b.status)}">${esc(stLabel(b.status))}</span><button class="x" data-act="close" aria-label="Close">×</button></div>
   <div class="sheet-b"><div class="detail">
@@ -1701,7 +1722,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.28.0";
+const APP_VERSION = "1.28.1";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2478,7 +2499,7 @@ document.addEventListener("change", async e => {
   if (e.target.dataset && e.target.dataset.tbrtoggle && S.openId){ const x = tbrShelves().find(z => z.id===e.target.dataset.tbrtoggle); tbrToggle(e.target.dataset.tbrtoggle, S.openId, e.target.checked); toast(e.target.checked ? `Added to ${x?x.name:"shelf"}` : `Removed from ${x?x.name:"shelf"}`); render(); return; }
   if (e.target.dataset && e.target.dataset.tbrbook && S.cm?.type==="tbrpick"){ tbrToggle(S.cm.id, e.target.dataset.tbrbook, e.target.checked); return; }
   if (e.target.id==="fOwned"){ S.fOwned=e.target.value; renderGrid(); return; }
-  if (e.target.id==="ownedToggle" && S.openId){ const on = e.target.checked; patch(S.openId, {owned: on}); toast(on ? "Marked as owned" : "Marked as not owned"); return; }
+  if (e.target.id==="ownedToggle" && S.openId){ const on = e.target.checked; const t = e.target.closest(".own-row")?.querySelector(".own-t .mini"); if (t) t.textContent = on ? "On your shelf at home" : "Not in your collection"; patch(S.openId, {owned: on}); toast(on ? "Marked as owned" : "Marked as not owned"); return; }
   if (e.target.id==="fFormat"){ S.fFormat=e.target.value; renderGrid(); return; }
   if (e.target.id==="fYear"){ S.fYear=e.target.value; renderGrid(); return; }
   if (e.target.id==="fTbr"){ S.fTbr=e.target.value; renderGrid(); return; }
@@ -2625,15 +2646,15 @@ window.NSApp = {
       S.books = snap.docs.map(d => ({id:d.id, ...d.data()})); S.loaded = true;
       if (S.editing) readForm();
       if (S.cm?.type==="form") readChal();
-      if (S.cm?.type==="bulk" || S.cm?.type==="account"){ if (S.tab!=="chal") $("#view").innerHTML = S.tab==="dash" ? dashHTML() : libHTML(), S.tab==="lib" && renderGrid(); else $("#view").innerHTML = chalHTML(); return; }
-      if (S.editing && document.activeElement && document.activeElement.closest && document.activeElement.closest("#bookForm")) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
+      if (S.cm?.type==="bulk" || S.cm?.type==="account"){ paintView(); return; }
+      if (S.editing && document.activeElement && document.activeElement.closest && document.activeElement.closest("#bookForm")) { paintView(); return; }
       render();
     }, err => { S.loaded = true; denied(err); render(); }));
     S.unsubs.push(S.db.collection("challenges").onSnapshot(snap => {
       S.challenges = snap.docs.map(d => ({id:d.id, ...d.data()}));
       if (S.cm?.type==="form") readChal();
       if (S.cm?.type==="pick"){ const q=$("#pickQ"); if (q && document.activeElement===q){ if (S.tab==="chal") $("#view").innerHTML = chalHTML(); return; } }
-      if (S.editing || S.cm) { $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML(); if (S.tab==="lib") renderGrid(); return; }
+      if (S.editing || S.cm) { paintView(); return; }
       render();
     }, ()=>{}));
     S.unsubs.push(S.db.collection("covers").onSnapshot(snap => {
