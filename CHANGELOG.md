@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.25.1 (October 8, 2026)
+- The Listening speed box starts at 1× and has − and + buttons that change it by 0.25. You can still type an exact speed like 1.1.
+- A speed left at the default 1× isn't saved, so it doesn't count toward your average listening speed. To count 1×, step away and back or type it in.
+
 ## 1.25.0 (October 8, 2026)
 - New **Avg days per book** stat tile: the average number of days from start to finish for that year's finished books, counting the start and finish days. Books with an estimated or missing start or finish date are left out. It can be hidden in Customize dashboard.
 

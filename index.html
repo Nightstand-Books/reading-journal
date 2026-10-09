@@ -232,6 +232,9 @@ body.ns-dragging,body.ns-dragging *{cursor:grabbing !important}
 .upnext-check{margin:0;align-items:center}
 .hm{width:58px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 8px;font-variant-numeric:tabular-nums}
 .hm-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.spd input{width:70px;text-align:center;-moz-appearance:textfield}.spd input::-webkit-inner-spin-button,.spd input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.spd-b{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.spd-b:hover{border-color:var(--muted)}
 .upnext-check input{width:18px;height:18px;margin:0}
 .un-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .upnext.reordering{flex-wrap:wrap;overflow:visible}
@@ -1629,7 +1632,7 @@ function formHTML(){
       <div class="f"><label for="f-pages">Total pages</label><input id="f-pages" name="pages" type="number" min="0" value="${esc(d.pages)}"></div>
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
       <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>
-      <div class="f"><label for="f-speed">Listening speed</label><span class="hm-row"><input id="f-speed" name="audioSpeed" type="number" min="0.5" max="4" step="0.05" inputmode="decimal" class="hm" style="width:76px" placeholder="1.0" value="${esc(d.audioSpeed||"")}"> × <span class="hint" style="margin-left:4px">like 1.5 for one and a half speed</span></span></div>` : ""}
+      <div class="f"><label for="f-speed">Listening speed</label><span class="hm-row spd"><button type="button" class="spd-b" data-act="spd-step" data-d="-1" aria-label="Slower by 0.25">−</button><input id="f-speed" name="audioSpeed" type="number" min="0.5" max="4" step="any" inputmode="decimal" class="hm" value="${esc(Number(d.audioSpeed) ? d.audioSpeed : 1)}"><span>×</span><button type="button" class="spd-b" data-act="spd-step" data-d="1" aria-label="Faster by 0.25">+</button><input type="hidden" name="audioSpeedSet" value="${d.audioSpeedSet !== undefined ? esc(d.audioSpeedSet) : Number(d.audioSpeed) ? 1 : 0}"></span><span class="hint">Steps by 0.25, or type an exact speed like 1.1</span></div>` : ""}
       <div class="f"><label for="f-cur">Pages read</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.status==="finished" && !(Number(d.currentPage) > 0) ? (d.pages||"") : d.currentPage)}"></div>
       ${dateFieldHTML("start", "Date started", d)}
       ${dateFieldHTML("finish", "Date finished", d)}
@@ -1685,7 +1688,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.25.0";
+const APP_VERSION = "1.25.1";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2287,6 +2290,9 @@ document.addEventListener("click", async e => {
     const h=$("#spPickHint"); if (h) h.textContent = m.pick ? `Tap anywhere on the cover to use that color for the ${m.pick==="color" ? "spine" : "text"}.` : "Choose what to color, then tap the cover. The color boxes' eyedropper can also sample it."; return; }
   if (act==="grid-size"){ const p=$("#gpop"); if (!p) return; p.hidden = !p.hidden; el.setAttribute("aria-expanded", String(!p.hidden)); if (!p.hidden){ setGridCols(gridCols(), false); p.style.left = ""; p.style.right = ""; const r = p.getBoundingClientRect(); if (r.left < 8){ p.style.right = "auto"; p.style.left = "0"; } } return; }
   if (act==="grid-more" || act==="grid-fewer"){ setGridCols(gridCols() + (act==="grid-more" ? 1 : -1), true); return; }
+  if (act==="spd-step"){ const i=$("#f-speed"); if (!i) return; const v = Number(i.value) || 1, d = Number(el.dataset.d);
+    let n = d > 0 ? Math.floor(v * 4 + 1e-9) / 4 + .25 : Math.ceil(v * 4 - 1e-9) / 4 - .25; n = Math.max(.5, Math.min(4, n));
+    i.value = String(n); const f = i.form.elements.audioSpeedSet; if (f) f.value = "1"; S.dirty = true; return; }
   if (act==="cats"){ S.openId=null; S.cm={type:"cats"}; renderModal(); return; }
   if (act==="genre-up"){ const i = Number(el.dataset.i), gl = [...genreList()]; if (i > 0){ [gl[i-1], gl[i]] = [gl[i], gl[i-1]]; saveSettings({genres: gl}); } renderModal(); return; }
   if (act==="genre-del"){ const gl = [...genreList()]; gl.splice(Number(el.dataset.i), 1); saveSettings({genres: gl}); renderModal(); return; }
@@ -2435,7 +2441,8 @@ document.addEventListener("submit", async e => {
   const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
-  { const sp = Number(data.audioSpeed); data.audioSpeed = sp >= 0.5 && sp <= 4 ? Math.round(sp * 100) / 100 : ""; }
+  { const sp = Number(data.audioSpeed), set = data.audioSpeedSet === "1" || data.audioSpeedSet === 1; delete data.audioSpeedSet;
+    data.audioSpeed = set && sp >= 0.5 && sp <= 4 ? Math.round(sp * 100) / 100 : ""; }   // left at the default 1×, it isn't counted
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);
@@ -2506,6 +2513,7 @@ document.addEventListener("change", async e => {
   }
 });
 document.addEventListener("input", e => {
+  if (e.target.id==="f-speed"){ const f = e.target.form && e.target.form.elements.audioSpeedSet; if (f) f.value = "1"; return; }
   if (e.target.id==="tbrQ" && S.cm?.type==="tbrpick"){ S.cm.q = e.target.value; const l = $("#tbrPickList"); if (l) l.innerHTML = tbrPickListHTML(); return; }
   if (S.cm?.type==="spine" && e.target.closest && e.target.closest("#spineForm")){
     const d = S.cm.d, id = e.target.id, v = e.target.value;
