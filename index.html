@@ -1311,7 +1311,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-k";
+const APP_VERSION = "2026.10.08-l";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -1480,7 +1480,7 @@ async function pickOl(i){
 }
 async function runBulkOL(){
   const todo = S.books.filter(needsLookup);
-  S.cm = {type:"bulk", done:0, total:todo.length, found:0, missed:0, stage: todo.length ? "running" : "done", err:""}; renderModal();
+  S.cm = {type:"bulk", by:{}, done:0, total:todo.length, found:0, missed:0, stage: todo.length ? "running" : "done", err:""}; renderModal();
   const me = S.cm;
   for (const b of todo){
     if (S.cm !== me) return;
@@ -1488,7 +1488,7 @@ async function runBulkOL(){
       const cur = S.books.find(x => x.id === b.id) || b; const {id, ...rest} = cur;
       if (cur.olKey && (String(cur.olKey).startsWith("hc:") || cur.hcChecked)){ // only missing the audiobook length
         const d = await hcFind(String(cur.title).replace(/\(.*?\)/g,"").split(":")[0].trim(), cur.author);
-        await saveBook(id, {...rest, audioChecked: today(), ...(d && d._audio ? {audioSeconds: d._audio} : {})}); d && d._audio ? me.found++ : me.missed++;
+        await saveBook(id, {...rest, audioChecked: today(), ...(d && d._audio ? {audioSeconds: d._audio} : {})}); if (d && d._audio){ me.found++; me.by.Hardcover = (me.by.Hardcover||0) + 1; } else me.missed++;
         me.done++; if (S.cm === me) renderModal(); await new Promise(r => setTimeout(r, 350)); continue;
       }
       const upgrade = !!cur.olKey; // already matched elsewhere: only ask Hardcover
@@ -1498,7 +1498,7 @@ async function runBulkOL(){
         const p = olPatch(d, work, cur, false);
         if (upgrade && d.cover_url && !cur.coverId){ p.coverUrl = d.cover_url; p.olCover = ""; }
         if (isAudio(cur)) p.audioChecked = today();
-        await saveBook(id, {...rest, ...p}); me.found++;
+        await saveBook(id, {...rest, ...p}); me.found++; const src = d._src || "Open Library"; me.by[src] = (me.by[src]||0) + 1;
       }
       else { await saveBook(id, {...rest, ...(upgrade ? {hcChecked: today()} : {olChecked: today()})}); me.missed++; }
     } catch(e){ me.err = navigator.onLine ? "The book sources stopped answering partway through. Books already matched are saved; run it again later for the rest." : "You went offline partway through. Books already matched are saved; run it again when you're back online."; break; }
@@ -1534,8 +1534,8 @@ function accountHTML(){
 function bulkHTML(){
   const m = S.cm; const pc = m.total ? Math.round(m.done/m.total*100) : 100;
   const head = `<div class="sheet-h"><h2>Find covers &amp; details</h2><button class="x" data-act="close" aria-label="${m.stage==="running"?"Stop":"Close"}">×</button></div>`;
-  if (m.stage==="running") return head + `<div class="sheet-b"><p class="num" style="margin:0 0 10px">Checking Open Library: ${m.done} of ${m.total}</p><div class="bar" style="height:10px"><i style="width:${pc}%"></i></div><p class="hint">Matched ${m.found} so far. You can close this to stop; matches already found are saved.</p></div>`;
-  return head + `<div class="sheet-b">${m.total ? `<h3 style="font-size:22px">Done</h3><p class="num">Found details for ${m.found} book${m.found===1?"":"s"}${m.missed?`. ${m.missed} had no match; open one and use <b>Find cover &amp; details</b> to search by hand`:""}.</p>` : `<p>Every book has already been checked.</p>`}
+  if (m.stage==="running") return head + `<div class="sheet-b"><p class="num" style="margin:0 0 10px">Checking ${hcProxy() ? "Hardcover first, then Google Books and Open Library" : "Google Books and Open Library"}: ${m.done} of ${m.total}</p><div class="bar" style="height:10px"><i style="width:${pc}%"></i></div><p class="hint">Matched ${m.found} so far. You can close this to stop; matches already found are saved.</p></div>`;
+  return head + `<div class="sheet-b">${m.total ? `<h3 style="font-size:22px">Done</h3><p class="num">Found details for ${m.found} book${m.found===1?"":"s"}${m.missed?`. ${m.missed} had no match; open one and use <b>Find cover &amp; details</b> to search by hand`:""}.</p>${Object.keys(m.by||{}).length ? `<p class="mini num">Matched from ${Object.entries(m.by).map(([k,v]) => `${esc(k)}: ${v}`).join(" · ")}</p>` : ""}${hcProxy() ? "" : `<p class="mini">Hardcover isn't connected, so only Google Books and Open Library were checked. Add the <code>HARDCOVER_PROXY</code> line to config.js to use it.</p>`}` : `<p>Every book has already been checked.</p>`}
     ${m.err?`<div class="err">${esc(m.err)}</div>`:""}<div class="foot"><span></span><button class="btn primary" data-act="close">Close</button></div></div>`;
 }
 
@@ -1713,7 +1713,7 @@ function importHTML(){
   }
   return head + `<div class="sheet-b"><h3 style="font-size:24px">${P.err?"Import stopped":"All set"}</h3>
     <p class="num">${P.kind==="Backup" ? `Restored ${P.restored?.books ?? 0} book${P.restored?.books===1?"":"s"} and ${P.restored?.challenges ?? 0} challenge${P.restored?.challenges===1?"":"s"}.` : `${P.added||0} new book${P.added===1?"":"s"} added, ${P.updated||0} updated from ${esc(P.kind)}.`}</p>
-    ${P.kind!=="Backup" && P.added ? `<p class="mini">Exports don't include covers. Use <b>Find covers &amp; details</b> to pull covers, descriptions and genres from Open Library.</p>` : ""}
+    ${P.kind!=="Backup" && P.added ? `<p class="mini">Exports don't include covers. Use <b>Find covers &amp; details</b> to pull covers, descriptions and genres${hcProxy() ? " from Hardcover, Google Books and Open Library" : " from Google Books and Open Library"}.</p>` : ""}
     ${P.err?`<div class="err">${esc(P.err)}</div>`:""}
     <div class="foot"><span></span><div class="grp">${P.kind!=="Backup" && P.added ? `<button class="btn" data-act="bulk-ol">Find covers &amp; details</button>` : `<button class="btn" data-act="imp-dash">See dashboard</button>`}<button class="btn primary" data-act="imp-lib">Open library</button></div></div></div>`;
 }
