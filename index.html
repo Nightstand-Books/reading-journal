@@ -1148,6 +1148,7 @@ function aedHTML(){
 
 /* ---------- audiobook time ---------- */
 const isAudio = b => b && b.format === "Audiobook";
+const spdOf = b => isAudio(b) ? (Number(b.audioSpeed) || (b.status === "finished" ? 1 : 0)) : 0;   // finished audiobooks count as 1× unless a speed was set
 const fmtSpeed = v => `${Number(v).toFixed(2).replace(/0$/, "").replace(/\.0$/, ".0")}×`;
 function fmtDur(sec){ sec = Math.max(0, Math.round(Number(sec)||0)); const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60); if (!h) return `${m} min`; return m ? `${h} hr ${m} min` : `${h} hr`; }
 const hmToSec = (h, m) => { const H = Number(h)||0, M = Number(m)||0; return H || M ? H*3600 + M*60 : 0; };
@@ -1308,11 +1309,11 @@ function dashHTML(){
 
   const hidden = new Set(S.settings.dashHidden || []), show = k => !hidden.has(k);
   const audioFin = fin.filter(b => isAudio(b) && Number(b.audioSeconds));
-  const speedList = [...fin, ...(y === thisYear ? reading : [])].filter(b => isAudio(b) && Number(b.audioSpeed));
+  const speedList = [...fin, ...(y === thisYear ? reading : [])].filter(b => spdOf(b));
   const dayOf = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d||"")) ? Date.UTC(+d.slice(0,4), +d.slice(5,7) - 1, +d.slice(8,10)) / 864e5 : null;
   const readSpans = fin.map(b => { const a = dayOf(b.startDate), z = dayOf(b.finishDate); return a !== null && z !== null && z >= a ? z - a + 1 : null; }).filter(v => v !== null);
   const avgDays = readSpans.length ? readSpans.reduce((t, v) => t + v, 0) / readSpans.length : 0;
-  const avgSpeed = speedList.length ? speedList.reduce((t, b) => t + Number(b.audioSpeed), 0) / speedList.length : 0;
+  const avgSpeed = speedList.length ? speedList.reduce((t, b) => t + spdOf(b), 0) / speedList.length : 0;
   const audioNowList = reading.filter(b => isAudio(b) && Number(b.audioPos)), audioNow = audioNowList.length;
   const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
   const tileList = [
@@ -1579,7 +1580,7 @@ function renderModal(){
         <div><span>Format</span><span>${esc(b.format||"—")}</span></div>
         <div><span>Pages</span><span class="num">${p||"—"}</span></div>
         ${isAudio(b) && (b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos)) ? `<div><span>Hours listened</span><span class="num">${fmtDur(b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos))}</span></div>` : ""}
-        ${isAudio(b) && Number(b.audioSpeed) ? `<div><span>Listening speed</span><span class="num">${fmtSpeed(b.audioSpeed)}</span></div>` : ""}
+        ${spdOf(b) ? `<div><span>Listening speed</span><span class="num">${fmtSpeed(spdOf(b))}</span></div>` : ""}
         ${b.audioSeconds ? `<div><span>Audiobook length</span><span class="num">${fmtDur(b.audioSeconds)}</span>${b.audioEdition?`<span class="mini">${esc(b.audioEdition)}</span>`:""}${S.canWrite && hcProxy() && isAudio(b) ? `<button class="linkish" data-act="aed" style="align-self:flex-start">Change edition</button>` : ""}</div>` : ""}
         <div><span>Source</span><span>${esc(b.source||"—")}</span></div>
         <div><span>Started</span><span>${fmtDate(b.startDate)}</span></div>
@@ -1688,7 +1689,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.25.1";
+const APP_VERSION = "1.25.2";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2405,7 +2406,7 @@ document.addEventListener("click", async e => {
     return; }
   if (act==="save-audio-len"){ const v = hmToSec($("#alH").value, $("#alM").value); if (!v){ $("#alH").focus(); return; } await patch(S.openId,{audioSeconds:v}); toast("Length saved"); return; }
   if (act==="save-page"){ const v=Number($("#curPage").value)||0; await patch(S.openId,{currentPage:v}); toast("Progress saved"); return; }
-  if (act==="finish"){ const b=S.books.find(x=>x.id===S.openId); await patch(S.openId,{status:"finished",finishDate:today(),currentPage:b.pages||b.currentPage||"", ...(b.audioSeconds ? {audioPos:b.audioSeconds} : {})}); toast("Finished! It's on your shelf."); return; }
+  if (act==="finish"){ const b=S.books.find(x=>x.id===S.openId); await patch(S.openId,{status:"finished",finishDate:today(),currentPage:b.pages||b.currentPage||"", ...(b.audioSeconds ? {audioPos:b.audioSeconds} : {}), ...(isAudio(b) && !Number(b.audioSpeed) ? {audioSpeed:1} : {})}); toast("Finished! It's on your shelf."); return; }
   if (act==="start"){ const sid = S.openId; if (inUpNext(sid)) saveUpNext((S.settings.upNext || []).filter(x => x !== sid)); await patch(sid,{status:"reading",startDate:today()}); toast("Happy reading"); return; }
   if (act==="disarm"){ S.armedDelete=false; renderModal(); return; }
   if (act==="delete"){
@@ -2442,7 +2443,8 @@ document.addEventListener("submit", async e => {
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
   { const sp = Number(data.audioSpeed), set = data.audioSpeedSet === "1" || data.audioSpeedSet === 1; delete data.audioSpeedSet;
-    data.audioSpeed = set && sp >= 0.5 && sp <= 4 ? Math.round(sp * 100) / 100 : ""; }   // left at the default 1×, it isn't counted
+    data.audioSpeed = set && sp >= 0.5 && sp <= 4 ? Math.round(sp * 100) / 100 : "";      // left at the default 1×, it isn't saved while still listening...
+    if (!data.audioSpeed && data.format === "Audiobook" && data.status === "finished") data.audioSpeed = 1; }   // ...but a finished audiobook saves 1×
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);

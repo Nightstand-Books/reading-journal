@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.25.2 (October 8, 2026)
+- Finished audiobooks save at 1× listening speed unless you set a different speed, and they count toward your average listening speed. This includes audiobooks finished before this update.
+- Audiobooks you're still listening to only count once you set a speed.
+
 ## 1.25.1 (October 8, 2026)
 - The Listening speed box starts at 1× and has − and + buttons that change it by 0.25. You can still type an exact speed like 1.1.
 - A speed left at the default 1× isn't saved, so it doesn't count toward your average listening speed. To count 1×, step away and back or type it in.
