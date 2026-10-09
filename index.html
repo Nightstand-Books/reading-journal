@@ -470,7 +470,6 @@ img{max-width:100%}
     <div class="actions">
       <label class="eyebrow" for="yearSel" style="margin-right:-4px">Year</label>
       <select class="pill" id="yearSel" aria-label="Year"></select>
-      <button class="btn" data-act="import" id="importBtn">Import</button>
       <button class="btn primary" data-act="new" id="addBtn">+ Add a book</button>
       <button class="avatar" data-act="account" id="acctBtn" aria-label="Account and backups">?</button>
     </div>
@@ -1144,7 +1143,6 @@ function render(){
   $("#yearSel").innerHTML = ys.map(y=>`<option value="${y}" ${y===S.year?"selected":""}>${y}</option>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===S.tab)));
   $("#addBtn").hidden = !S.canWrite || S.noDb;
-  $("#importBtn").hidden = !S.canWrite || S.noDb;
   renderNotice();
   $("#view").innerHTML = S.tab==="dash" ? dashHTML() : S.tab==="chal" ? chalHTML() : S.tab==="tbr" ? tbrHTML() : libHTML();
   if (S.tab==="dash" && S.loaded) queueSpineColors(finishedIn(S.year));
@@ -1214,7 +1212,7 @@ function dashHTML(){
   const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
   const tileList = [
     ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
-    ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span><span class="mini">${audioFin.length} audiobook${audioFin.length===1?"":"s"} finished${audioNow ? " + in progress" : ""}</span></div>`],
+    ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span></div>`],
     ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
     ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
     ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
@@ -1462,7 +1460,7 @@ function formHTML(){
       <div class="f"><label for="f-pages">Total pages</label><input id="f-pages" name="pages" type="number" min="0" value="${esc(d.pages)}"></div>
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
       <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>` : ""}
-      <div class="f"><label for="f-cur">Current page</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.currentPage)}"></div>
+      <div class="f"><label for="f-cur">Pages read</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.status==="finished" && !(Number(d.currentPage) > 0) ? (d.pages||"") : d.currentPage)}"></div>
       <div class="f"><label for="f-start">Date started</label><input id="f-start" name="startDate" type="date" value="${esc(d.startDate)}"></div>
       <div class="f"><label for="f-finish">Date finished</label><input id="f-finish" name="finishDate" type="date" value="${esc(d.finishDate)}"></div>
       <div class="f"><label for="f-cost">Cost ($)</label><input id="f-cost" name="cost" type="number" min="0" step="0.01" value="${esc(d.cost)}"></div>
@@ -1510,7 +1508,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-v";
+const APP_VERSION = "2026.10.08-w";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2230,6 +2228,7 @@ document.addEventListener("submit", async e => {
   if (!S.draft.title.trim()){ S.err="Give the book a title."; renderModal(); return; }
   const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
+  if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);
@@ -2254,7 +2253,9 @@ document.addEventListener("change", async e => {
   if (e.target.dataset && e.target.dataset.genreI !== undefined && S.cm?.type==="cats"){ renameGenre(Number(e.target.dataset.genreI), e.target.value); return; }
   if (e.target.dataset && e.target.dataset.st && S.cm?.type==="cats"){ const k = e.target.dataset.st, v = e.target.value.trim(); const n = {...(S.settings.statusNames||{})}; if (!v || v === STATUS[k]) delete n[k]; else n[k] = v; saveSettings({statusNames: n}); render(); renderModal(); return; }
   if (e.target.dataset && e.target.dataset.cstI !== undefined && S.cm?.type==="cats"){ const v = e.target.value.trim(), list = customStatuses().map(x => ({...x})), i = Number(e.target.dataset.cstI); if (v && list[i]){ list[i].name = v; saveSettings({statuses: list}); render(); } renderModal(); return; }
-  if (e.target.id==="f-status" && S.editing && $("#f-format")?.value==="Audiobook"){ readForm(); if (S.draft.status==="finished" && Number(S.draft.audioSeconds)) S.draft.audioPos = Number(S.draft.audioSeconds); renderModal(); $("#f-status")?.focus(); return; }
+  if (e.target.id==="f-status" && S.editing){ readForm();
+    if (S.draft.status==="finished"){ if (Number(S.draft.pages)) S.draft.currentPage = Number(S.draft.pages); if (S.draft.format==="Audiobook" && Number(S.draft.audioSeconds)) S.draft.audioPos = Number(S.draft.audioSeconds); }
+    renderModal(); $("#f-status")?.focus(); return; }
   if (e.target.id==="f-format" && S.editing){ readForm(); renderModal(); $("#f-format")?.focus(); }
   if (e.target.id==="unToggle" && S.openId){
     const id = S.openId, ids = (S.settings.upNext || []).filter(x => x !== id);
