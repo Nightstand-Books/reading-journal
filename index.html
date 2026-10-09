@@ -990,7 +990,7 @@ document.addEventListener("pointerup", endUnDrag); document.addEventListener("po
 /* ---------- customize dashboard ---------- */
 const DASH_PARTS = [
   ["Sections", [["goal","Reading goal"],["shelf","Bookcase"],["nightstand","On the nightstand"],["monthly","Books finished by month"],["genres","What you read (genres and formats)"],["moods","How your reading felt (moods)"],["pace","Pace"]]],
-  ["Stat tiles", [["t-pages","Pages read"],["t-hours","Hours listened"],["t-rating","Average rating"],["t-reading","Reading now"],["t-tbr","Want to read"],["t-spent","Spent on books"],["t-length","Avg length"]]]
+  ["Stat tiles", [["t-pages","Pages read"],["t-hours","Hours listened"],["t-speed","Avg listening speed"],["t-rating","Average rating"],["t-reading","Reading now"],["t-tbr","Want to read"],["t-spent","Spent on books"],["t-length","Avg length"]]]
 ];
 function dashCustomHTML(){
   const hidden = new Set(S.settings.dashHidden || []);
@@ -1145,6 +1145,7 @@ function aedHTML(){
 
 /* ---------- audiobook time ---------- */
 const isAudio = b => b && b.format === "Audiobook";
+const fmtSpeed = v => `${Number(v).toFixed(2).replace(/0$/, "").replace(/\.0$/, ".0")}×`;
 function fmtDur(sec){ sec = Math.max(0, Math.round(Number(sec)||0)); const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60); if (!h) return `${m} min`; return m ? `${h} hr ${m} min` : `${h} hr`; }
 const hmToSec = (h, m) => { const H = Number(h)||0, M = Number(m)||0; return H || M ? H*3600 + M*60 : 0; };
 const secH = sec => sec ? Math.floor(sec/3600) : "", secM = sec => sec ? Math.round((sec%3600)/60) : "";
@@ -1304,11 +1305,14 @@ function dashHTML(){
 
   const hidden = new Set(S.settings.dashHidden || []), show = k => !hidden.has(k);
   const audioFin = fin.filter(b => isAudio(b) && Number(b.audioSeconds));
+  const speedList = [...fin, ...(y === thisYear ? reading : [])].filter(b => isAudio(b) && Number(b.audioSpeed));
+  const avgSpeed = speedList.length ? speedList.reduce((t, b) => t + Number(b.audioSpeed), 0) / speedList.length : 0;
   const audioNowList = reading.filter(b => isAudio(b) && Number(b.audioPos)), audioNow = audioNowList.length;
   const listened = audioFin.reduce((t, b) => t + Number(b.audioSeconds), 0) + (y === thisYear ? audioNowList.reduce((t, b) => t + Number(b.audioPos), 0) : 0);
   const tileList = [
     ["t-pages",   `<div class="tile"><span class="eyebrow">Pages read</span><span class="v num">${pages.toLocaleString()}</span></div>`],
     ["t-hours",   `<div class="tile"><span class="eyebrow">Hours listened</span><span class="v num">${(Math.round(listened/360)/10).toLocaleString()} <small>hr</small></span></div>`],
+    ["t-speed",   `<div class="tile"><span class="eyebrow">Avg listening speed</span><span class="v num">${avgSpeed ? fmtSpeed(avgSpeed) : "—"}</span></div>`],
     ["t-rating",  `<div class="tile"><span class="eyebrow">Average rating</span><span class="v num">${avg?avg.toFixed(1):"—"} <small>/ 5</small></span><span class="stars">${stars(Math.round(avg*2)/2)}</span>${commLine}</div>`],
     ["t-reading", `<div class="tile"><span class="eyebrow">Reading now</span><span class="v num">${reading.length}</span></div>`],
     ["t-tbr",     `<div class="tile"><span class="eyebrow">Want to read</span><span class="v num">${tbr.length}</span></div>`],
@@ -1568,6 +1572,7 @@ function renderModal(){
         <div><span>Format</span><span>${esc(b.format||"—")}</span></div>
         <div><span>Pages</span><span class="num">${p||"—"}</span></div>
         ${isAudio(b) && (b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos)) ? `<div><span>Hours listened</span><span class="num">${fmtDur(b.status==="finished" ? Number(b.audioPos)||Number(b.audioSeconds) : Number(b.audioPos))}</span></div>` : ""}
+        ${isAudio(b) && Number(b.audioSpeed) ? `<div><span>Listening speed</span><span class="num">${fmtSpeed(b.audioSpeed)}</span></div>` : ""}
         ${b.audioSeconds ? `<div><span>Audiobook length</span><span class="num">${fmtDur(b.audioSeconds)}</span>${b.audioEdition?`<span class="mini">${esc(b.audioEdition)}</span>`:""}${S.canWrite && hcProxy() && isAudio(b) ? `<button class="linkish" data-act="aed" style="align-self:flex-start">Change edition</button>` : ""}</div>` : ""}
         <div><span>Source</span><span>${esc(b.source||"—")}</span></div>
         <div><span>Started</span><span>${fmtDate(b.startDate)}</span></div>
@@ -1619,7 +1624,8 @@ function formHTML(){
       <div class="f"><label for="f-source">Source</label><select id="f-source" name="source"><option value="">—</option>${opt(SOURCES,d.source)}</select></div>
       <div class="f"><label for="f-pages">Total pages</label><input id="f-pages" name="pages" type="number" min="0" value="${esc(d.pages)}"></div>
       ${d.format === "Audiobook" ? `<div class="f"><label>Audiobook length</label><span class="hm-row"><input name="aLenH" type="number" min="0" class="hm" value="${secH(d.audioSeconds)}" aria-label="Length hours"> hr <input name="aLenM" type="number" min="0" max="59" class="hm" value="${secM(d.audioSeconds)}" aria-label="Length minutes"> min</span></div>
-      <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>` : ""}
+      <div class="f"><label>${d.status==="finished" ? "Hours listened" : "Listened so far"}</label><span class="hm-row"><input name="aPosH" type="number" min="0" class="hm" value="${secH(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Hours listened"> hr <input name="aPosM" type="number" min="0" max="59" class="hm" value="${secM(d.status==="finished" ? (Number(d.audioPos)||Number(d.audioSeconds)) : d.audioPos)}" aria-label="Minutes listened"> min</span>${d.status==="finished" ? `<span class="hint">Fills in from the length when the book is finished.</span>` : ""}</div>
+      <div class="f"><label for="f-speed">Listening speed</label><span class="hm-row"><input id="f-speed" name="audioSpeed" type="number" min="0.5" max="4" step="0.05" inputmode="decimal" class="hm" style="width:76px" placeholder="1.0" value="${esc(d.audioSpeed||"")}"> × <span class="hint" style="margin-left:4px">like 1.5 for one and a half speed</span></span></div>` : ""}
       <div class="f"><label for="f-cur">Pages read</label><input id="f-cur" name="currentPage" type="number" min="0" value="${esc(d.status==="finished" && !(Number(d.currentPage) > 0) ? (d.pages||"") : d.currentPage)}"></div>
       ${dateFieldHTML("start", "Date started", d)}
       ${dateFieldHTML("finish", "Date finished", d)}
@@ -1675,7 +1681,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.23.0";
+const APP_VERSION = "1.24.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2425,6 +2431,7 @@ document.addEventListener("submit", async e => {
   const data = clean(S.draft); delete data.example; rememberGenre(data.genre);
   if (data.format==="Audiobook" && data.status==="finished" && Number(data.audioSeconds) && !(Number(data.audioPos) > 0)) data.audioPos = Number(data.audioSeconds);
   if (data.status==="finished" && Number(data.pages) && !(Number(data.currentPage) > 0)) data.currentPage = Number(data.pages);
+  { const sp = Number(data.audioSpeed); data.audioSpeed = sp >= 0.5 && sp <= 4 ? Math.round(sp * 100) / 100 : ""; }
   S.busy=true; S.err=""; renderModal();
   try {
     const id = await saveBook(S.openId==="new"?null:S.openId, data);

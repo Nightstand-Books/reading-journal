@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.24.0 (October 8, 2026)
+- Audiobooks have a **Listening speed** field in Edit book (for example 1.5 for one and a half speed). It shows in the book's details.
+- New **Avg listening speed** stat tile on the dashboard, next to Hours listened. It averages the audiobooks you finished that year, plus the ones you're listening to now in the current year. It can be hidden in Customize dashboard.
+
 ## 1.23.0 (October 8, 2026)
 - Library cover sizes now go by **books per row**. Each row count has one fixed size, and the covers always fill the row evenly.
 - The cover size control moved off the top of the book grid into a small grid button next to Sort. Tap it to choose bigger or smaller covers; it shows how many books fit per row.
