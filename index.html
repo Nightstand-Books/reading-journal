@@ -184,6 +184,13 @@ select.pill{border:1px solid var(--line);background:var(--surface);border-radius
 
 .reading-list{display:flex;flex-direction:column;gap:14px}
 .reading-item{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;cursor:pointer;background:none;border:0;text-align:left;padding:0}
+.reading-item.ns-drag{grid-template-columns:52px 1fr 18px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;border-radius:10px;transition:background .15s}
+.reading-item.ns-drag img{-webkit-user-drag:none;pointer-events:none}
+.ns-grip{color:var(--muted);font-size:14px;letter-spacing:-3px;opacity:.45;cursor:grab;text-align:center}
+.reading-item.ns-drag:hover .ns-grip{opacity:.9}
+.reading-item.dragging{opacity:.6;background:var(--sunk);box-shadow:0 8px 20px -10px rgba(0,0,0,.4)}
+body.ns-dragging,body.ns-dragging *{cursor:grabbing !important}
+.ns-hint{margin:10px 0 0}
 .reading-item .t{font-weight:700;line-height:1.25}
 .reading-item .a{color:var(--muted);font-size:13px}
 .fmt{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px 2px 6px;border-radius:999px;border:1px solid currentColor}
@@ -872,6 +879,55 @@ function saveUpNext(ids){
   S.settings = {...S.settings, upNext: ids};
   S.db?.doc("settings/main").set(S.settings).catch(err => toast(writeErr(err)));
 }
+/* nightstand: drag books straight into a new order, no edit mode */
+function nightOrdered(list){
+  const order = S.settings.nightOrder || [], pos = id => { const i = order.indexOf(id); return i < 0 ? Infinity : i; };
+  return [...list].sort((a,b) => pos(a.id) - pos(b.id) || String(b.startDate||"").localeCompare(String(a.startDate||"")));
+}
+let nsDrag = null, nsSuppressClick = false;
+function nsStart(d){ d.started = true; d.it.classList.add("dragging"); document.body.classList.add("ns-dragging"); if (navigator.vibrate) try { navigator.vibrate(10); } catch(_){} }
+function nsMoveTo(x, y){
+  const d = nsDrag; if (!d || !d.started) return;
+  const el = document.elementFromPoint(x, y), over = el && el.closest(".reading-list .reading-item");
+  if (over && over !== d.it){ const r = over.getBoundingClientRect(); over.parentNode.insertBefore(d.it, y > r.top + r.height / 2 ? over.nextSibling : over); }
+}
+function nsEnd(){
+  const d = nsDrag; if (!d) return; nsDrag = null; clearTimeout(d.timer);
+  if (!d.started) return;
+  d.it.classList.remove("dragging"); document.body.classList.remove("ns-dragging");
+  nsSuppressClick = true; setTimeout(() => { nsSuppressClick = false; }, d.touch ? 500 : 0);
+  const ids = [...document.querySelectorAll(".reading-list .reading-item")].map(x => x.dataset.id);
+  saveSettings({nightOrder: ids}); render();
+}
+const nsItem = t => S.canWrite && t.closest && t.closest(".reading-list .reading-item.ns-drag");
+// mouse / pen: drag as soon as the pointer moves a little
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch" || e.button > 0) return;
+  const it = nsItem(e.target); if (!it) return;
+  nsDrag = {it, x:e.clientX, y:e.clientY, started:false, touch:false};
+});
+document.addEventListener("pointermove", e => {
+  const d = nsDrag; if (!d || d.touch) return;
+  if (!d.started){ if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return; nsStart(d); }
+  e.preventDefault(); nsMoveTo(e.clientX, e.clientY);
+}, {passive:false});
+document.addEventListener("pointerup", e => { if (nsDrag && !nsDrag.touch) nsEnd(); });
+// touch: press and hold, then drag (a quick swipe still scrolls the page)
+document.addEventListener("touchstart", e => {
+  if (e.touches.length !== 1) { if (nsDrag) nsEnd(); return; }
+  const it = nsItem(e.target); if (!it) return;
+  const t0 = e.touches[0], d = nsDrag = {it, x:t0.clientX, y:t0.clientY, started:false, touch:true};
+  d.timer = setTimeout(() => { if (nsDrag === d) nsStart(d); }, 350);
+}, {passive:true});
+document.addEventListener("touchmove", e => {
+  const d = nsDrag; if (!d || !d.touch) return; const t0 = e.touches[0];
+  if (!d.started){ if (Math.hypot(t0.clientX - d.x, t0.clientY - d.y) > 8){ clearTimeout(d.timer); nsDrag = null; } return; }
+  if (e.cancelable) e.preventDefault(); nsMoveTo(t0.clientX, t0.clientY);
+}, {passive:false});
+document.addEventListener("touchend", e => { if (nsDrag && nsDrag.touch) nsEnd(); });
+document.addEventListener("touchcancel", e => { if (nsDrag && nsDrag.touch) nsEnd(); });
+document.addEventListener("contextmenu", e => { if (nsDrag) e.preventDefault(); });
+
 let unDrag = null;
 document.addEventListener("pointerdown", e => {
   if (!S.unReorder || e.target.closest(".un-arrow")) return;
@@ -1138,7 +1194,7 @@ async function runSpineQueue(){
 
 /* ---------- render ---------- */
 function render(){
-  if (shelfDrag || (unDrag && unDrag.started)) { renderModal(); return; }
+  if (shelfDrag || (unDrag && unDrag.started) || (nsDrag && nsDrag.started)) { renderModal(); return; }
   const ys = yearsAvailable();
   $("#yearSel").innerHTML = ys.map(y=>`<option value="${y}" ${y===S.year?"selected":""}>${y}</option>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===S.tab)));
@@ -1164,7 +1220,7 @@ function dashHTML(){
   const pages = fin.reduce((s,b)=>s+(Number(b.pages)||0),0);
   const rated = fin.filter(b=>Number(b.rating)>0);
   const avg = rated.length ? rated.reduce((s,b)=>s+Number(b.rating),0)/rated.length : 0;
-  const reading = S.books.filter(b=>b.status==="reading");
+  const reading = nightOrdered(S.books.filter(b=>b.status==="reading"));
   const tbr = S.books.filter(b => b.status === "tbr"), un = upNextList();
   const spent = S.books.filter(b=>yr(b.dateAdded)===y).reduce((s,b)=>s+(Number(b.cost)||0),0);
   const both = rated.filter(b=>Number(b.communityRating)>0);
@@ -1235,7 +1291,7 @@ function dashHTML(){
   const readingPanel = `<section class="panel"><div class="panel-h"><h2>On the nightstand</h2></div>
     ${reading.length ? `<div class="reading-list">${reading.map(b=>{
       const pr = progressOf(b), pc = pr.pc;
-      return `<button class="reading-item" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div>${formatChip(b.format)}<div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${esc(pr.line)}</div></div></button>`;}).join("")}</div>`
+      return `<button class="reading-item${S.canWrite && reading.length > 1 ? " ns-drag" : ""}" data-act="open" data-id="${esc(b.id)}">${cover(b,"sm")}<div style="min-width:0"><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author||"")}</div>${formatChip(b.format)}<div class="bar"><i style="width:${pc}%"></i></div><div class="mini num">${esc(pr.line)}</div></div>${S.canWrite && reading.length > 1 ? `<span class="ns-grip" aria-hidden="true" title="Drag to reorder">⋮⋮</span>` : ""}</button>`;}).join("")}</div>${S.canWrite && reading.length > 1 ? `<p class="mini ns-hint">Drag a book to reorder${matchMedia("(pointer:coarse)").matches ? " (press and hold first)" : ""}.</p>` : ""}`
       : `<p class="empty">Nothing in progress. Open a book from your library and mark it as reading.</p>`}
     ${un.length ? `<div class="block"><div class="un-head"><span class="eyebrow">Up next</span>${S.canWrite && un.length > 1 ? `<button class="linkish" data-act="un-reorder">${S.unReorder ? "Done" : "Reorder"}</button>` : ""}</div>
       ${S.unReorder ? `<p class="mini" style="margin:0 0 8px">Drag covers into the order you plan to read them, or use the arrows.</p>` : ""}
@@ -1508,7 +1564,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-w";
+const APP_VERSION = "2026.10.08-x";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
@@ -2067,6 +2123,7 @@ async function shrink(file){
 
 /* ---------- events ---------- */
 document.addEventListener("click", async e => {
+  if (nsSuppressClick && e.target.closest(".reading-item")){ nsSuppressClick = false; e.preventDefault(); return; }
   const el = e.target.closest("[data-act]"); if(!el) return;
   const act = el.dataset.act;
   if (act==="tab"){ S.shelfEdit=false; S.shelfSel=null; S.tab=el.dataset.tab; render(); return; }
