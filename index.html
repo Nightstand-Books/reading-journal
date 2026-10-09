@@ -818,10 +818,10 @@ const THEMES = {
                                dark: T("#0c141b","#132029","#09111a","#e1e9ef","#93a4b1","#24343f","#7fb0d1","#0c141b","#d6aa55","#d77f62","#6a4327","#452a16","#08101a")},
   plum:     {label:"Plum",     light:T("#efe9ef","#f9f6f9","#e6dde6","#2a1d2a","#6b5a6b","#dacfda","#5e3460","#f9f3f9","#a57724","#a4472f","#6e4a3a","#4f3226","#e4dae4"),
                                dark: T("#161017","#211823","#110c12","#efe5ef","#ab98ab","#3a2c3b","#c69bc8","#161017","#d6aa55","#d98a74","#5e3d30","#3e271e","#0f0a10")},
-  rosewood: {label:"Rosewood", light:T("#f3eae9","#fbf6f5","#ecdedc","#2e1d1c","#735c5a","#e2d0ce","#8a3a4a","#fbf4f3","#a57724","#b0532f","#7b502f","#5b3a20","#ead9d7"),
-                               dark: T("#18100f","#241817","#120b0b","#f2e5e3","#b39895","#3d2b29","#e09aa6","#18100f","#d6aa55","#e08a62","#6a4327","#452a16","#100a09")},
-  clay:     {label:"Clay",     light:T("#f1ebe3","#faf6f0","#e9e0d4","#2b2018","#6e5f52","#ddd1c2","#9a4a2a","#fbf5ef","#9a7020","#8f3a2a","#7b502f","#5b3a20","#e7ddd0"),
-                               dark: T("#17110c","#231a13","#110c08","#f1e7dc","#b19e8c","#3b2d22","#e2956f","#17110c","#d6aa55","#e0806a","#6a4327","#452a16","#0f0b07")},
+  rosewood: {label:"Rosewood", light:T("#f7eaee","#fdf7f9","#f1dee4","#2f1a20","#7a5a63","#ead2da","#a03b5a","#fff7f9","#c26d84","#b23a48","#7c3542","#55222c","#f4e2e8"),
+                               dark: T("#1a1013","#26161b","#140b0e","#f6e6eb","#c09aa4","#43262f","#f0a3b6","#1a1013","#e7a0b0","#f08a7a","#6e2b37","#4a1a23","#130a0d")},
+  clay:     {label:"Clay",     light:T("#f8ece3","#fdf7f2","#f3e0d3","#2e1d15","#7a5f50","#ecd4c4","#b4502a","#fff8f2","#d08a3a","#a8322a","#b4683f","#874528","#f5e3d6"),
+                               dark: T("#1b120e","#271a14","#140d0a","#f7e9df","#c4a18c","#452c20","#f0956a","#1b120e","#e6b25c","#f07f63","#8a4628","#5e2e19","#130c09")},
   slate:    {label:"Slate",    light:T("#ebecee","#f7f8f9","#e0e2e5","#1d2126","#5f6670","#d2d6db","#34404c","#f4f6f8","#a57724","#a4472f","#6f5640","#4f3d2c","#dfe2e6"),
                                dark: T("#111316","#1a1d21","#0c0e10","#e6e8eb","#9aa1aa","#2b3036","#aab7c4","#111316","#d6aa55","#d77f62","#5e4a37","#3e3124","#0b0c0e")}
 };
@@ -1567,7 +1567,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "2026.10.08-y";
+const APP_VERSION = "2026.10.08-z";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
 async function getJSON(url, signal, ms=15000){
