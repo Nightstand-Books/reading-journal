@@ -360,7 +360,10 @@ form .fg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16p
 .sw[aria-pressed="true"]{border-color:var(--ink)}
 .hint{font-size:12.5px;color:var(--muted)}
 .err{color:var(--rust);font-size:13.5px;margin-top:10px}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;z-index:30}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%, 8px);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;z-index:30;text-align:center;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s ease, transform .3s ease, visibility 0s linear .3s}
+.toast.show{opacity:1;visibility:visible;transform:translate(-50%, 0);transition:opacity .3s ease, transform .3s ease, visibility 0s}
+.toast.hint{font-style:italic}
+@media (prefers-reduced-motion:reduce){.toast,.toast.show{transition:opacity .2s, visibility 0s linear .2s;transform:translate(-50%, 0)}}
 /* import, summary, moods */
 .imp-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
 @media (max-width:600px){.imp-cols{grid-template-columns:1fr}}
@@ -516,7 +519,7 @@ img{max-width:100%}
 </div>
 </div>
 <div class="scrim" id="scrim" hidden><div class="sheet" role="dialog" aria-modal="true" id="sheet"></div></div>
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (() => {
@@ -546,7 +549,8 @@ const isEstDate = d => !!d && String(d).length < 10;
 const stars = r => { r = Number(r)||0; if(!r) return ""; const f=Math.floor(r); return "★".repeat(f) + (r-f>=.5?"½":""); };
 const money = n => "$" + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
 
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2200); }
+function toast(msg, opts={}){ const t=$("#toast"); t.textContent=msg; t.classList.toggle("hint", !!opts.hint);
+  t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"), opts.ms || 2200); }
 
 /* ---------- covers & spines ---------- */
 function cover(b, cls=""){
@@ -1427,10 +1431,10 @@ function chalBadge(list){
 /* library cover size: slider, two-finger pinch, or trackpad pinch; remembered on this device */
 const GRID_MIN = 80, GRID_MAX = 260;
 function gridSize(){ if (S.gridSize) return S.gridSize; let v = 0; try { v = Number(localStorage.getItem("ns-grid")) || 0; } catch(_){} return S.gridSize = v ? Math.max(GRID_MIN, Math.min(GRID_MAX, v)) : 150; }
-function setGridSize(v, save){
+function setGridSize(v, save, fromInput){
   v = Math.max(GRID_MIN, Math.min(GRID_MAX, Math.round(v / 10) * 10)); S.gridSize = v;
   const g = document.querySelector("#grid .grid"); if (g){ g.style.setProperty("--card", v + "px"); g.classList.toggle("small", v < 110); }
-  const r = $("#gridSize"); if (r && document.activeElement !== r) r.value = v;
+  const r = $("#gridSize"); if (r && !fromInput) r.value = v;
   if (save) try { localStorage.setItem("ns-grid", String(v)); } catch(_){}
 }
 /* on touch screens the size slider only responds after a press and hold, so scrolling past it can't change the size */
@@ -1448,7 +1452,7 @@ document.addEventListener("touchmove", e => {
   if (e.cancelable) e.preventDefault(); gsFromX(t0.clientX);
 }, {passive:false});
 const gsEnd = () => { const h = gsHold; if (!h) return; gsHold = null; clearTimeout(h.timer);
-  if (h.armed){ h.w.classList.remove("armed"); setGridSize(S.gridSize, true); } else toast("Press and hold the slider to resize, or pinch the covers"); };
+  if (h.armed){ h.w.classList.remove("armed"); setGridSize(S.gridSize, true); } else toast("Press and hold to resize, or pinch the covers", {hint:true, ms:2600}); };
 document.addEventListener("touchend", gsEnd); document.addEventListener("touchcancel", () => { const h = gsHold; if (h){ gsHold = null; clearTimeout(h.timer); h.w.classList.remove("armed"); } });
 let pinch = null;
 document.addEventListener("touchstart", e => {
@@ -1655,7 +1659,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.22.1";
+const APP_VERSION = "1.22.2";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2493,7 +2497,7 @@ document.addEventListener("input", e => {
   }
   if (e.target.id==="olq" && S.ol){ S.ol.q=e.target.value; S.ol.picked=false; clearTimeout(S.ol.t); S.ol.t=setTimeout(runOlSearch, 450); }
   if (e.target.id==="q"){ S.q=e.target.value; renderGrid(); }
-  if (e.target.id==="gridSize"){ setGridSize(Number(e.target.value), true); }
+  if (e.target.id==="gridSize"){ setGridSize(Number(e.target.value), true, true); }
   if (e.target.id==="pickQ" && S.cm){ S.cm.q=e.target.value; $("#pickList").innerHTML = pickListHTML(); }
 });
 function dismiss(soft){ if (S.imp?.stage==="running") return;

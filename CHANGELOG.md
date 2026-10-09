@@ -16,6 +16,11 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.22.2 (October 8, 2026)
+- Pop-up messages fade in and out smoothly, with centered text.
+- The "press and hold to resize" reminder is in italics and fits on one line.
+- Fixed: the cover size slider's handle sometimes didn't move along with a press-and-hold resize.
+
 ## 1.22.1 (October 8, 2026)
 - On phones and tablets, the cover size slider only responds after you press and hold it, so scrolling past it no longer changes the size by accident. A quick tap shows a reminder of how to use it.
 
