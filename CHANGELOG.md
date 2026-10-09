@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.26.0 (October 8, 2026)
+- The Library can filter by format: Print, Ebook or Audiobook. Books without a format count as Print. It works together with the other filters.
+
 ## 1.25.2 (October 8, 2026)
 - Finished audiobooks save at 1× listening speed unless you set a different speed, and they count toward your average listening speed. This includes audiobooks finished before this update.
 - Audiobooks you're still listening to only count once you set a speed.
