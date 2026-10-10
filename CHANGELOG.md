@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.35.0 (October 9, 2026)
+- Each challenge spot has a short **title** (like "Read any book") plus optional **more details**: the rules, ideas or tips for that spot. Add them in the challenge's Edit screen with **+ Add more details** under each title.
+- Spots with details show a small ⓘ next to their title. Tapping the spot or the ⓘ opens it with the full details shown above the book picker.
+
 ## 1.34.0 (October 9, 2026)
 - Each challenge has stat tiles under its progress bar: **Pages read** and **Pages to go**, plus **Hours listened** and **Hours to go** when it has audiobooks.
 - Challenges with an end date also show **Days left** and how many spots are still to go.

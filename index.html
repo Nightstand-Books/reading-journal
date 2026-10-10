@@ -469,6 +469,15 @@ button.pill{border:1px solid var(--line);background:var(--surface);border-radius
 .ghost-row .ph-n{font-size:18px}
 .prompt-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;padding-right:4px}
 .prow{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center}
+.prow-wrap{display:flex;flex-direction:column;gap:4px;padding-bottom:6px;border-bottom:1px dashed var(--line)}
+.pdet{margin-left:36px}
+.pdet summary{cursor:pointer;font-size:12.5px;color:var(--accent);font-weight:700;list-style:none;padding:2px 0}
+.pdet summary::-webkit-details-marker{display:none}
+.pdet[open] summary{color:var(--muted)}
+.pdet textarea{width:100%;margin-top:4px;min-height:64px}
+.pinfo{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--muted);background:none;color:var(--muted);font:italic 700 11px Georgia,serif;cursor:pointer;vertical-align:1px;margin-left:2px;padding:0}
+.pinfo:hover{border-color:var(--accent);color:var(--accent)}
+.slot-details{margin:10px 0 0;font-size:14.5px;line-height:1.5;color:var(--ink);background:var(--sunk);border-radius:10px;padding:12px 14px;max-width:62ch}
 .prow .pn{color:var(--muted);font-weight:700;text-align:right}
 .prow input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
 .picked{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);margin-bottom:16px}
@@ -1780,7 +1789,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.34.0";
+const APP_VERSION = "1.35.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2228,7 +2237,7 @@ function slotHTML(c, s, i){
   const art = b ? `<div class="slot-cover">${cover(b)}${mark}</div>` : `<div class="ph"><span class="ph-n">${i+1}</span><span class="ph-add">${S.canWrite?"+ Choose a book":"Empty"}</span></div>`;
   return `<div class="cslot">
     <button class="cover-btn" data-act="${S.canWrite?"pick":"open"}" data-cid="${esc(c.id)}" data-i="${i}" ${b&&!S.canWrite?`data-id="${esc(b.id)}"`:""} aria-label="${b?esc(b.title):"Empty spot "+(i+1)}: ${esc(s.prompt||"No prompt")}">${art}</button>
-    <div class="prompt"><span class="pn num">${i+1}.</span> ${esc(s.prompt||"No prompt")}</div>
+    <div class="prompt"><span class="pn num">${i+1}.</span> ${esc(s.prompt||"No prompt")}${s.details ? ` <button class="pinfo" data-act="${S.canWrite?"pick":"slot-info"}" data-cid="${esc(c.id)}" data-i="${i}" aria-label="More details for spot ${i+1}" title="More details">i</button>` : ""}</div>
     ${b?`<div class="cbook">${esc(b.title)}</div>`:""}
   </div>`;
 }
@@ -2258,7 +2267,7 @@ function cmHTML(){
   if (m.type==="pick"){
     const c = S.challenges.find(x=>x.id===m.cid); if(!c) return "";
     const s = c.slots[m.i]; const cur = s.bookId && S.books.find(x=>x.id===s.bookId);
-    return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">${esc(c.name)} · spot ${m.i+1}</div><h2 style="margin-top:2px">${esc(s.prompt||"No prompt")}</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>
+    return `<div class="sheet-h"><div style="min-width:0"><div class="eyebrow">${esc(c.name)} · spot ${m.i+1}</div><h2 style="margin-top:2px">${esc(s.prompt||"No prompt")}</h2>${s.details ? `<p class="slot-details">${esc(s.details).replace(/\n/g,"<br>")}</p>` : ""}</div><button class="x" data-act="close" aria-label="Close">×</button></div>
     <div class="sheet-b">
       ${cur?`<div class="picked">${cover(cur,"sm")}<div style="min-width:0"><div class="eyebrow">In this spot now</div><div style="font-weight:700">${esc(cur.title)}</div><div class="mini">${esc(cur.author||"")}</div></div>
         <div class="grp"><button class="btn" data-act="open" data-id="${esc(cur.id)}">Open book</button><button class="btn danger" data-act="slot-clear">Empty this spot</button></div></div>`:""}
@@ -2279,9 +2288,11 @@ function cmHTML(){
       <div class="f"><label for="c-count">Number of books</label><input id="c-count" name="count" type="number" min="1" max="100" value="${d.prompts.length}"></div>
       <div class="f" style="justify-content:flex-end"><button type="button" class="btn ghost" data-act="chal-paste-toggle">${m.paste?"Type prompts one by one":"Paste a list of prompts"}</button></div>
       ${m.paste?`<div class="f full"><label for="c-paste">Prompts, one per line</label><textarea id="c-paste" style="min-height:220px" placeholder="A book set in a country you've never visited&#10;A book with a color in the title&#10;A book under 200 pages">${esc(d.prompts.filter(Boolean).join("\n"))}</textarea><span class="hint">Each line becomes a spot. Numbers and bullets at the start of a line are removed. The book count updates to match.</span></div>`
-      : `<div class="f full"><label>Prompt for each book</label><div class="prompt-list">${d.prompts.map((p,i)=>{
+      : `<div class="f full"><label>Title and details for each spot</label><div class="prompt-list">${d.prompts.map((p,i)=>{
           const filled = d.slots[i]?.bookId && S.books.find(b=>b.id===d.slots[i].bookId);
-          return `<div class="prow"><span class="pn num">${i+1}</span><input name="p-${i}" value="${esc(p)}" aria-label="Prompt ${i+1}" placeholder="Prompt for book ${i+1}">${filled?`<span class="mini" title="${esc(filled.title)}">has a book</span>`:""}</div>`;}).join("")}</div></div>`}
+          const dt = (d.details||[])[i] || "";
+          return `<div class="prow-wrap"><div class="prow"><span class="pn num">${i+1}</span><input name="p-${i}" value="${esc(p)}" aria-label="Title for spot ${i+1}" placeholder="Title, like Read any book">${filled?`<span class="mini" title="${esc(filled.title)}">has a book</span>`:""}</div>
+            <details class="pdet" ${dt?"open":""}><summary>${dt?"More details":"+ Add more details"}</summary><textarea name="dt-${i}" rows="3" aria-label="More details for spot ${i+1}" placeholder="Explain this spot: rules, ideas, tips">${esc(dt)}</textarea></details></div>`;}).join("")}</div></div>`}
     </div>
     ${m.warn?`<div class="err">${esc(m.warn)}</div>`:""}${m.err?`<div class="err">${esc(m.err)}</div>`:""}
     <div class="foot"><div class="grp">${m.id?`<button type="button" class="btn danger ${m.armed?"armed":""}" data-act="chal-delete">${m.armed?"Yes, delete challenge":"Delete challenge"}</button>${m.armed?`<button type="button" class="btn ghost" data-act="chal-disarm">Keep it</button>`:""}`:""}</div>
@@ -2307,19 +2318,21 @@ function readChal(){
   ["name","description","startDate","endDate"].forEach(k => { const el=f.elements[k]; if(el) d[k]=el.value; });
   const paste = f.querySelector("#c-paste");
   if (paste){ d.prompts = paste.value.split("\n").map(x=>x.replace(/^\s*(\d+[.)]|[-*•])\s*/,"").trim()).filter(Boolean); if(!d.prompts.length) d.prompts=[""]; }
-  else d.prompts = d.prompts.map((p,i)=> f.elements["p-"+i] ? f.elements["p-"+i].value : p);
+  else { d.prompts = d.prompts.map((p,i)=> f.elements["p-"+i] ? f.elements["p-"+i].value : p);
+    d.details = d.prompts.map((_,i)=> f.elements["dt-"+i] ? f.elements["dt-"+i].value : ((d.details||[])[i] || "")); }
 }
 function resizePrompts(n){
   const d = S.cm.draft; n = Math.max(1, Math.min(100, Math.round(n)||1));
   while (d.prompts.length < n) d.prompts.push("");
   if (d.prompts.length > n) d.prompts.length = n;
+  d.details = d.prompts.map((_,i) => (d.details||[])[i] || "");
   const lost = d.slots.slice(n).filter(s=>s.bookId).length;
   S.cm.warn = lost ? `${lost} book${lost===1?" is":"s are"} in the spots you're removing. ${lost===1?"It":"They"} will be taken out of this challenge (not deleted from your library).` : "";
 }
 async function saveChallenge(){
   readChal(); const m = S.cm, d = m.draft;
   if (!d.name.trim()){ m.err="Give the challenge a name."; renderModal(); return; }
-  const slots = d.prompts.map((p,i)=>({prompt:p.trim(), bookId: d.slots[i]?.bookId || null}));
+  const slots = d.prompts.map((p,i)=>({prompt:p.trim(), details:String((d.details||[])[i]||"").trim(), bookId: d.slots[i]?.bookId || null}));
   const data = {name:d.name.trim(), description:d.description.trim(), startDate:d.startDate||"", endDate:d.endDate||"", slots, createdAt:d.createdAt||Date.now()};
   S.busy=true; renderModal();
   try { await S.db.collection("challenges").doc(m.id || undefined).set(data); S.cm=null; toast(m.id?"Challenge saved":"Challenge created"); }
@@ -2485,9 +2498,10 @@ document.addEventListener("click", async e => {
   if (act==="cover-plain"){ const id=S.cm.id; const b=S.books.find(x=>x.id===id); S.cm=null; S.openId=id; renderModal(); if(b){ const {id:_x,...rest}=b; await saveBook(id,{...rest, coverUrl:"", olCover:"", coverId:null, ...(b.spineManual ? {} : {spineColor:"", spineText:"", spineFor:""})}); if (b.coverId && S.assets) S.assets.delete(b.coverId).catch(()=>{}); toast("Using a plain color cover"); render(); } return; }
   if (act==="cover-photo"){ const id=S.cm.id; const b=S.books.find(x=>x.id===id); S.cm=null; S.openId=id; if(b){ S.draft={...blank(),...b}; S.editing=true; S.ol=freshOl(); S.err=""; } renderModal(); setTimeout(()=>$("#coverFile")?.focus(),50); return; }
   if (act==="ol-lookup"){ const b=S.books.find(x=>x.id===S.openId); if(!b) return; S.draft={...blank(),...b}; S.editing=true; S.err=""; S.ol=freshOl(`${b.title} ${b.author||""}`.trim()); renderModal(); runOlSearch(); return; }
-  if (act==="chal-new"){ S.cm={type:"form", id:null, paste:false, draft:{name:"",description:"",startDate:"",endDate:"",prompts:Array(12).fill(""),slots:[]}}; renderModal(); setTimeout(()=>$("#c-name")?.focus(),30); return; }
+  if (act==="chal-new"){ S.cm={type:"form", id:null, paste:false, draft:{name:"",description:"",startDate:"",endDate:"",prompts:Array(12).fill(""),details:Array(12).fill(""),slots:[]}}; renderModal(); setTimeout(()=>$("#c-name")?.focus(),30); return; }
   if (act==="chal-edit"){ const c=S.challenges.find(x=>x.id===el.dataset.cid); if(!c) return;
-    S.cm={type:"form", id:c.id, paste:false, draft:{name:c.name||"",description:c.description||"",startDate:c.startDate||"",endDate:c.endDate||"",prompts:(c.slots||[]).map(s=>s.prompt||""),slots:(c.slots||[]).map(s=>({...s})),createdAt:c.createdAt}}; renderModal(); return; }
+    S.cm={type:"form", id:c.id, paste:false, draft:{name:c.name||"",description:c.description||"",startDate:c.startDate||"",endDate:c.endDate||"",prompts:(c.slots||[]).map(s=>s.prompt||""),details:(c.slots||[]).map(s=>s.details||""),slots:(c.slots||[]).map(s=>({...s})),createdAt:c.createdAt}}; renderModal(); return; }
+  if (act==="slot-info"){ const c=S.challenges.find(x=>x.id===el.dataset.cid), sl=c && c.slots[Number(el.dataset.i)]; if (sl) toast(sl.details, {ms:6000}); return; }
   if (act==="chal-paste-toggle"){ readChal(); S.cm.paste=!S.cm.paste; resizePrompts(S.cm.draft.prompts.length); renderModal(); return; }
   if (act==="chal-disarm"){ S.cm.armed=false; renderModal(); return; }
   if (act==="chal-delete"){ if(!S.cm.armed){ readChal(); S.cm.armed=true; renderModal(); return; }
