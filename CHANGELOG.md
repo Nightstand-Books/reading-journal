@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.36.0 (October 9, 2026)
+- Challenges can be collapsed. Tap the arrow next to a challenge's name (or the name itself) to fold it down to just its title and progress bar, and again to open it. Folded challenges stay folded on every device.
+- Rearrange challenges with the ▲ ▼ buttons next to Edit. Your order is saved, and new challenges appear at the top.
+
 ## 1.35.0 (October 9, 2026)
 - Each challenge spot has a short **title** (like "Read any book") plus optional **more details**: the rules, ideas or tips for that spot. Add them in the challenge's Edit screen with **+ Add more details** under each title.
 - Spots with details show a small ⓘ next to their title. Tapping the spot or the ⓘ opens it with the full details shown above the book picker.

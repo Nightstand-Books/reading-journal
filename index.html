@@ -444,7 +444,13 @@ button.pill{border:1px solid var(--line);background:var(--surface);border-radius
 /* challenges */
 .chal-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .chal{margin-bottom:18px}
-.chal-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.chal-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.chal-fold{flex:0 0 auto;width:30px;height:30px;margin-top:2px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.chal-fold svg{width:15px;height:15px;transition:transform .2s}
+.chal.shut .chal-fold svg{transform:rotate(-90deg)}
+.chal-acts{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+.chal-mv{padding:4px 8px}
+.chal.shut .chal-prog{margin:12px 0 0}
 .chal-h h2{font-size:24px}
 .chal-d{margin:4px 0 2px;color:var(--muted);max-width:65ch}
 .chal-prog{display:flex;align-items:center;gap:14px;margin:14px 0 18px;font-size:14px;flex-wrap:wrap}
@@ -1789,7 +1795,7 @@ function clean(d){
 
 /* ---------- Open Library ---------- */
 const OL = "https://openlibrary.org";
-const APP_VERSION = "1.35.0";
+const APP_VERSION = "1.36.0";
 const CHANGELOG_URL = "https://github.com/Nightstand-Books/reading-journal/blob/main/CHANGELOG.md";
 const OL_FIELDS = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,ratings_average,ratings_count";
 // fetch JSON with a time limit; failures carry a short reason we can show
@@ -2209,6 +2215,11 @@ function chalStats(c){
   return {total:slots.length, done, going, filled};
 }
 /* reading totals for the books in a challenge's spots (each book counted once) */
+function chalOrdered(){
+  const order = S.settings.chalOrder || [], pos = id => { const i = order.indexOf(id); return i < 0 ? -1 : i; };
+  // challenges not placed yet (new ones) go first, newest first; the rest follow your saved order
+  return [...S.challenges].sort((a,b) => { const pa = pos(a.id), pb = pos(b.id); if (pa < 0 || pb < 0) return (pa < 0 ? 0 : 1) - (pb < 0 ? 0 : 1) || (b.createdAt||0) - (a.createdAt||0); return pa - pb; });
+}
 function chalTilesHTML(c){
   const seen = new Set(), books = (c.slots||[]).map(s => s.bookId && S.books.find(x => x.id === s.bookId)).filter(b => b && !seen.has(b.id) && seen.add(b.id));
   if (!books.length) return "";
@@ -2248,17 +2259,18 @@ function chalHTML(){
       <div class="ghost-row" aria-hidden="true">${[1,2,3,4,5,6].map(n=>`<div class="ph"><span class="ph-n">${n}</span></div>`).join("")}</div>
       <h2>No reading challenges yet</h2>
       <p>Set up a challenge with a spot for each book, like "a book set in a country you've never visited" or "a book under 200 pages." Fill each spot as you read.</p>${add}</div>`;
-  const list = [...S.challenges].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const list = chalOrdered(), collapsed = new Set(S.settings.chalCollapsed || []);
   return `<div class="chal-top"><p class="mini" style="margin:0">${list.length} challenge${list.length===1?"":"s"}. Tap a spot to choose its book.</p>${add}</div>` +
-    list.map(c => { const st = chalStats(c); const pct = st.total ? st.done/st.total*100 : 0;
+    list.map((c, ci) => { const st = chalStats(c); const pct = st.total ? st.done/st.total*100 : 0, shut = collapsed.has(c.id);
       const dates = c.startDate||c.endDate ? `${c.startDate?fmtDate(c.startDate):"Anytime"} – ${c.endDate?fmtDate(c.endDate):"no end date"}` : "";
-      return `<section class="panel chal">
-        <div class="chal-h"><div style="min-width:0"><h2>${esc(c.name)}</h2>${c.description?`<p class="chal-d">${esc(c.description)}</p>`:""}${dates?`<div class="mini">${dates}</div>`:""}</div>
-          ${S.canWrite?`<button class="btn ghost" data-act="chal-edit" data-cid="${esc(c.id)}">Edit</button>`:""}</div>
+      return `<section class="panel chal${shut ? " shut" : ""}">
+        <div class="chal-h"><button class="chal-fold" data-act="chal-fold" data-cid="${esc(c.id)}" aria-expanded="${!shut}" aria-label="${shut ? "Expand" : "Collapse"} ${esc(c.name)}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div style="min-width:0;flex:1"><h2 data-act="chal-fold" data-cid="${esc(c.id)}" style="cursor:pointer">${esc(c.name)}</h2>${!shut && c.description?`<p class="chal-d">${esc(c.description)}</p>`:""}${!shut && dates?`<div class="mini">${dates}</div>`:""}</div>
+          <div class="grp chal-acts">${S.canWrite && list.length > 1 ? `<button class="un-arrow chal-mv" data-act="chal-move" data-cid="${esc(c.id)}" data-d="-1" ${ci===0?"disabled":""} aria-label="Move ${esc(c.name)} up">▲</button><button class="un-arrow chal-mv" data-act="chal-move" data-cid="${esc(c.id)}" data-d="1" ${ci===list.length-1?"disabled":""} aria-label="Move ${esc(c.name)} down">▼</button>` : ""}${S.canWrite && !shut?`<button class="btn ghost" data-act="chal-edit" data-cid="${esc(c.id)}">Edit</button>`:""}</div></div>
         <div class="chal-prog"><div class="bar" style="height:8px;flex:1"><i style="width:${pct}%;background:var(--accent)"></i></div>
           <span class="num"><b>${st.done}</b> of ${st.total} finished${st.going?` · ${st.going} reading`:""}${st.filled-st.done-st.going>0?` · ${st.filled-st.done-st.going} picked`:""}${st.done===st.total&&st.total?" · Complete!":""}</span></div>
-        ${chalTilesHTML(c)}
-        <div class="cgrid">${(c.slots||[]).map((s,i)=>slotHTML(c,s,i)).join("")}</div>
+        ${shut ? "" : `${chalTilesHTML(c)}
+        <div class="cgrid">${(c.slots||[]).map((s,i)=>slotHTML(c,s,i)).join("")}</div>`}
       </section>`; }).join("");
 }
 
@@ -2502,6 +2514,10 @@ document.addEventListener("click", async e => {
   if (act==="chal-edit"){ const c=S.challenges.find(x=>x.id===el.dataset.cid); if(!c) return;
     S.cm={type:"form", id:c.id, paste:false, draft:{name:c.name||"",description:c.description||"",startDate:c.startDate||"",endDate:c.endDate||"",prompts:(c.slots||[]).map(s=>s.prompt||""),details:(c.slots||[]).map(s=>s.details||""),slots:(c.slots||[]).map(s=>({...s})),createdAt:c.createdAt}}; renderModal(); return; }
   if (act==="slot-info"){ const c=S.challenges.find(x=>x.id===el.dataset.cid), sl=c && c.slots[Number(el.dataset.i)]; if (sl) toast(sl.details, {ms:6000}); return; }
+  if (act==="chal-fold"){ const id = el.dataset.cid, set = new Set(S.settings.chalCollapsed || []); set.has(id) ? set.delete(id) : set.add(id); saveSettings({chalCollapsed: [...set]}); render(); return; }
+  if (act==="chal-move"){ const ids = chalOrdered().map(c => c.id), i = ids.indexOf(el.dataset.cid), j = i + Number(el.dataset.d); if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]]; saveSettings({chalOrder: ids}); render();
+    requestAnimationFrame(() => document.querySelector(`[data-act="chal-move"][data-cid="${CSS.escape(ids[j])}"][data-d="${el.dataset.d}"]`)?.closest(".panel")?.scrollIntoView({block:"nearest", behavior:"smooth"})); return; }
   if (act==="chal-paste-toggle"){ readChal(); S.cm.paste=!S.cm.paste; resizePrompts(S.cm.draft.prompts.length); renderModal(); return; }
   if (act==="chal-disarm"){ S.cm.armed=false; renderModal(); return; }
   if (act==="chal-delete"){ if(!S.cm.armed){ readChal(); S.cm.armed=true; renderModal(); return; }
