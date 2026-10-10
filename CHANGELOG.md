@@ -16,6 +16,10 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.38.0 (October 9, 2026)
+- Drag a challenge from anywhere on it, not just a handle. Hovering over a challenge highlights it the same way books on the nightstand do. On a phone, press and hold a challenge for a moment, then drag; a normal swipe still scrolls.
+- The ⋮⋮ handle was removed. Tapping a book spot, the title, Edit or the ▲ ▼ buttons works as before.
+
 ## 1.37.0 (October 9, 2026)
 - Drag challenges into any order using the ⋮⋮ handle next to the ▲ ▼ buttons. It works with a mouse or a finger, and the page scrolls if you drag near the top or bottom edge. The ▲ ▼ buttons still work too.
 
