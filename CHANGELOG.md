@@ -16,6 +16,9 @@ Builds before 1.20.1 used date-based names. Each entry lists its old name in bra
 
 ---
 
+## 1.37.0 (October 9, 2026)
+- Drag challenges into any order using the ⋮⋮ handle next to the ▲ ▼ buttons. It works with a mouse or a finger, and the page scrolls if you drag near the top or bottom edge. The ▲ ▼ buttons still work too.
+
 ## 1.36.0 (October 9, 2026)
 - Challenges can be collapsed. Tap the arrow next to a challenge's name (or the name itself) to fold it down to just its title and progress bar, and again to open it. Folded challenges stay folded on every device.
 - Rearrange challenges with the ▲ ▼ buttons next to Edit. Your order is saved, and new challenges appear at the top.
